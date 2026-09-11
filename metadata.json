@@ -1,0 +1,6 @@
+{
+  "name": "H2-Shield™ Safety System",
+  "description": "Real-time telemetry playback dashboard and automated isolation monitoring for composite hydrogen storage tanks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

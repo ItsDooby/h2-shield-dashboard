@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>H2-Shield™ Safety System</title>
+  <meta name="description" content="H2-Shield™ mission-critical hydrogen tank safety and telemetry playback dashboard." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @keyframes strobeRed {
+      0%, 100% { fill: rgba(239, 68, 68, 0.2); stroke: #ef4444; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.8)); }
+      50% { fill: rgba(239, 68, 68, 0.7); stroke: #fee2e2; filter: drop-shadow(0 0 25px rgba(239, 68, 68, 1)); }
+    }
+    @keyframes pulseAmber {
+      0%, 100% { fill: rgba(245, 158, 11, 0.2); stroke: #f59e0b; filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6)); }
+      50% { fill: rgba(245, 158, 11, 0.55); stroke: #fef3c7; filter: drop-shadow(0 0 18px rgba(245, 158, 11, 0.9)); }
+    }
+    @keyframes pulseNormal {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 1; }
+    }
+    .zone-pulse-amber { animation: pulseAmber 1.2s infinite ease-in-out; }
+    .zone-strobe-red { animation: strobeRed 0.5s infinite ease-in-out; }
+    .custom-scroll::-webkit-scrollbar { width: 4px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #0b1120; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+  </style>
+</head>
+<body class="bg-[#0B1120] text-slate-100 min-h-screen font-mono antialiased selection:bg-cyan-500 selection:text-white p-3 lg:p-5 flex flex-col gap-4">
+
+  <!-- TOP HEADER / STATUS BAR -->
+  <header id="top-bar" class="bg-slate-900/80 border border-slate-800/80 rounded-xl p-3.5 backdrop-blur shadow-2xl flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="p-2.5 bg-cyan-950/60 border border-cyan-500/40 rounded-lg text-cyan-400">
+        <i data-lucide="shield-alert" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-bold tracking-wider text-slate-100 flex items-center gap-1.5">
+            H2-SHIELD<span class="text-cyan-400 text-xs px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-800">PRO-v4</span>
+          </h1>
+          <span class="text-[11px] text-slate-400 uppercase tracking-widest hidden sm:inline">| Type-IV Tank Telemetry</span>
+        </div>
+        <p class="text-xs text-slate-400 font-sans">Automated Acoustic Localizer & Rapid Solenoid Isolation Engine</p>
+      </div>
+    </div>
+
+    <!-- Live Simulation Time & Status Badges -->
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="bg-slate-950 border border-slate-800 px-3.5 py-1.5 rounded-lg flex items-center gap-2.5">
+        <i data-lucide="clock" class="w-4 h-4 text-cyan-400"></i>
+        <span class="text-xs text-slate-400 tracking-wider">TIME:</span>
+        <span id="sim-clock" class="text-lg font-bold text-cyan-400 tracking-widest">T+00s</span>
+      </div>
+
+      <!-- System Status Badge -->
+      <div id="sys-status-badge" class="px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border bg-emerald-950/60 border-emerald-500/50 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span id="sys-status-text">NORMAL</span>
+      </div>
+
+      <!-- Valve Status Badge -->
+      <div id="valve-status-badge" class="px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border bg-emerald-950/60 border-emerald-500/50 text-emerald-400">
+        <i id="valve-badge-icon" data-lucide="unlock" class="w-4 h-4"></i>
+        <span id="valve-status-text">VALVE OPEN</span>
+      </div>
+
+      <!-- WiFi / Link Badge -->
+      <div class="hidden md:flex items-center gap-1.5 text-xs text-emerald-400 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
+        <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+        <span class="text-[11px] text-slate-300">LINK: 100%</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- SAFETY SEQUENCE BANNER -->
+  <section id="safety-sequence-banner" class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+    <div class="flex items-center gap-2 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+      <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+      <span>Safety Response Protocol:</span>
+    </div>
+    <div id="seq-steps" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[11px]">
+      <span data-seq="monitor" class="px-2.5 py-1 rounded border transition-all duration-300 bg-cyan-950/80 border-cyan-400 text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.3)]">1. Monitor</span>
+      <span class="text-slate-600">→</span>
+      <span data-seq="detect" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">2. Detect</span>
+      <span class="text-slate-600">→</span>
+      <span data-seq="verify" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">3. Verify</span>
+      <span class="text-slate-600">→</span>
+      <span data-seq="localize" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">4. Localize (Zone C)</span>
+      <span class="text-slate-600">→</span>
+      <span data-seq="isolate" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">5. Isolate</span>
+      <span class="text-slate-600">→</span>
+      <span data-seq="confirm" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">6. Confirm</span>
+    </div>
+  </section>
+
+  <!-- PLAYBACK CONTROL BAR -->
+  <section id="playback-controls" class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+    <div class="flex items-center gap-2">
+      <button id="btn-play-pause" class="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+        <i id="play-pause-icon" data-lucide="play" class="w-4 h-4"></i>
+        <span id="play-pause-label">PLAY</span>
+      </button>
+      <button id="btn-reset" class="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition">
+        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        <span>RESET</span>
+      </button>
+    </div>
+
+    <!-- Scrubber Slider -->
+    <div class="flex-1 min-w-[240px] flex items-center gap-3">
+      <span class="text-xs text-slate-400 font-mono">0s</span>
+      <input id="scrubber-slider" type="range" min="0" max="180" value="0" step="1"
+        class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400" />
+      <span class="text-xs text-slate-400 font-mono">180s</span>
+    </div>
+
+    <!-- Speed Toggles -->
+    <div class="flex items-center gap-1.5 bg-slate-950 p-1 border border-slate-800 rounded-lg">
+      <span class="text-[10px] text-slate-400 px-2 uppercase font-semibold">Speed:</span>
+      <button data-speed="1" class="speed-btn px-2.5 py-1 text-xs font-bold rounded bg-cyan-600 text-white">1x</button>
+      <button data-speed="2" class="speed-btn px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white">2x</button>
+      <button data-speed="5" class="speed-btn px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white">5x</button>
+    </div>
+  </section>
+
+  <!-- MAIN TELEMETRY GRID -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+    <!-- LEFT COLUMN: Physical Tank Schematic + Gauges (7 cols) -->
+    <div class="lg:col-span-7 flex flex-col gap-4">
+
+      <!-- PHYSICAL TANK SCHEMATIC -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="cylinder" class="w-4 h-4 text-cyan-400"></i>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-200">Composite Tank Vessel — Acoustic Localization Schematic</h2>
+          </div>
+          <span id="valve-state-tag" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-700">SOLENOID ENERGIZED (OPEN)</span>
+        </div>
+
+        <!-- SVG Tank Graphic -->
+        <div class="relative w-full aspect-[21/9] flex items-center justify-center bg-slate-950/60 rounded-lg border border-slate-800/60 p-2 overflow-hidden">
+          <svg viewBox="0 0 800 320" class="w-full h-full select-none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="tankBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#1e293b" />
+                <stop offset="50%" stop-color="#0f172a" />
+                <stop offset="100%" stop-color="#090d16" />
+              </linearGradient>
+              <linearGradient id="pipeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#64748b" />
+                <stop offset="50%" stop-color="#334155" />
+                <stop offset="100%" stop-color="#1e293b" />
+              </linearGradient>
+              <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Annular Shell Background (Pressure Boundary) -->
+            <rect x="150" y="40" width="460" height="230" rx="90" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="6 4" opacity="0.6"/>
+            <text x="380" y="32" fill="#64748b" font-size="10" text-anchor="middle" letter-spacing="2">VACUUM / ANNULAR MONITORING SPACE</text>
+
+            <!-- Inlet / Outlet Lines -->
+            <path d="M 60 155 L 170 155" stroke="url(#pipeGrad)" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 590 155 L 740 155" stroke="url(#pipeGrad)" stroke-width="14" stroke-linecap="round"/>
+
+            <!-- Automated Isolation Solenoid Valve on Outlet Line (x: 640, y: 155) -->
+            <g id="valve-graphic" transform="translate(640, 155)">
+              <rect x="-24" y="-28" width="48" height="56" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+              <!-- Valve Flanges -->
+              <polygon points="-16,-18 0,0 -16,18" fill="#38bdf8" id="valve-gate-left"/>
+              <polygon points="16,-18 0,0 16,18" fill="#38bdf8" id="valve-gate-right"/>
+              <circle cx="0" cy="0" r="5" fill="#f8fafc" id="valve-pin"/>
+              <circle cx="0" cy="-36" r="8" fill="#10b981" id="valve-indicator-light"/>
+              <text x="0" y="42" fill="#94a3b8" font-size="9" font-family="monospace" text-anchor="middle" id="valve-subtext">SV-101 OPEN</text>
+            </g>
+
+            <!-- Inlet Flow Arrow -->
+            <path d="M 80 155 L 110 155" stroke="#38bdf8" stroke-width="3" stroke-dasharray="8 6" opacity="0.8"/>
+
+            <!-- Main Cylindrical Composite Tank Shell (x: 170, y: 55, w: 420, h: 200) -->
+            <!-- Left Dome -->
+            <path d="M 230 55 C 160 55, 160 255, 230 255 Z" fill="url(#tankBodyGrad)" stroke="#475569" stroke-width="2"/>
+            <!-- Right Dome -->
+            <path d="M 530 55 C 600 55, 600 255, 530 255 Z" fill="url(#tankBodyGrad)" stroke="#475569" stroke-width="2"/>
+            <!-- Center Cylinder -->
+            <rect x="230" y="55" width="300" height="200" fill="url(#tankBodyGrad)" stroke="#475569" stroke-width="2"/>
+
+            <!-- Divider Grid Lines for Quadrants A, B, C, D -->
+            <line x1="380" y1="55" x2="380" y2="255" stroke="#334155" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="170" y1="155" x2="590" y2="155" stroke="#334155" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+            <!-- ZONE A (Top Left Quadrant) -->
+            <path id="zone-A" d="M 230 57 C 180 57, 180 153, 230 153 L 378 153 L 378 57 Z"
+              fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1.5" class="transition-all duration-300"/>
+            <circle cx="280" cy="105" r="4" fill="#34d399"/>
+            <text x="280" y="93" fill="#6ee7b7" font-size="11" font-weight="bold" text-anchor="middle">ZONE A</text>
+            <text id="txt-zone-A" x="280" y="125" fill="#a7f3d0" font-size="9" text-anchor="middle">5.1 dB</text>
+
+            <!-- ZONE B (Top Right Quadrant) -->
+            <path id="zone-B" d="M 382 57 L 530 57 C 580 57, 580 153, 530 153 L 382 153 Z"
+              fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1.5" class="transition-all duration-300"/>
+            <circle cx="480" cy="105" r="4" fill="#34d399"/>
+            <text x="480" y="93" fill="#6ee7b7" font-size="11" font-weight="bold" text-anchor="middle">ZONE B</text>
+            <text id="txt-zone-B" x="480" y="125" fill="#a7f3d0" font-size="9" text-anchor="middle">5.3 dB</text>
+
+            <!-- ZONE C (Bottom Left Quadrant) - CRITICAL ANOMALY LOCATION -->
+            <path id="zone-C" d="M 230 157 C 180 157, 180 253, 230 253 L 378 253 L 378 157 Z"
+              fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1.5" class="transition-all duration-300"/>
+            <circle cx="280" cy="205" r="4" fill="#34d399" id="sensor-c-dot"/>
+            <text x="280" y="193" fill="#6ee7b7" font-size="11" font-weight="bold" text-anchor="middle" id="lbl-zone-C">ZONE C</text>
+            <text id="txt-zone-C" x="280" y="225" fill="#a7f3d0" font-size="9" text-anchor="middle">5.3 dB</text>
+
+            <!-- ZONE D (Bottom Right Quadrant) -->
+            <path id="zone-D" d="M 382 157 L 530 157 C 580 157, 580 253, 530 253 L 382 253 Z"
+              fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1.5" class="transition-all duration-300"/>
+            <circle cx="480" cy="205" r="4" fill="#34d399"/>
+            <text x="480" y="193" fill="#6ee7b7" font-size="11" font-weight="bold" text-anchor="middle">ZONE D</text>
+            <text id="txt-zone-D" x="480" y="225" fill="#a7f3d0" font-size="9" text-anchor="middle">5.6 dB</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- CORE GAUGES ROW (5 Telemetry metrics) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+        <!-- Temp -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-400 text-[11px]">
+            <span>Temperature</span>
+            <i data-lucide="thermometer" class="w-3.5 h-3.5 text-amber-400"></i>
+          </div>
+          <div class="my-1.5 flex items-baseline gap-1">
+            <span id="val-temp" class="text-xl font-bold text-slate-100">24.89</span>
+            <span class="text-xs text-slate-400">°C</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div id="bar-temp" class="bg-amber-400 h-full w-[35%] transition-all duration-200"></div>
+          </div>
+        </div>
+
+        <!-- Tank Pressure -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-400 text-[11px]">
+            <span>Tank Press</span>
+            <i data-lucide="gauge" class="w-3.5 h-3.5 text-cyan-400"></i>
+          </div>
+          <div class="my-1.5 flex items-baseline gap-1">
+            <span id="val-press" class="text-xl font-bold text-cyan-400">1.022</span>
+            <span class="text-xs text-slate-400">bar</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div id="bar-press" class="bg-cyan-400 h-full w-[50%] transition-all duration-200"></div>
+          </div>
+        </div>
+
+        <!-- Annular Pressure -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-400 text-[11px]">
+            <span>Annular Press</span>
+            <i data-lucide="shield" class="w-3.5 h-3.5 text-indigo-400"></i>
+          </div>
+          <div class="my-1.5 flex items-baseline gap-1">
+            <span id="val-annular" class="text-xl font-bold text-indigo-400">1.014</span>
+            <span class="text-xs text-slate-400">bar</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div id="bar-annular" class="bg-indigo-400 h-full w-[50%] transition-all duration-200"></div>
+          </div>
+        </div>
+
+        <!-- Structural Strain -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-400 text-[11px]">
+            <span>Strain</span>
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-orange-400"></i>
+          </div>
+          <div class="my-1.5 flex items-baseline gap-1">
+            <span id="val-strain" class="text-xl font-bold text-orange-400">99.2</span>
+            <span class="text-xs text-slate-400">µε</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div id="bar-strain" class="bg-orange-400 h-full w-[40%] transition-all duration-200"></div>
+          </div>
+        </div>
+
+        <!-- H2 Leak PPM -->
+        <div id="card-leak" class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between transition-colors duration-300">
+          <div class="flex items-center justify-between text-slate-400 text-[11px]">
+            <span>H2 Leak</span>
+            <i data-lucide="wind" class="w-3.5 h-3.5 text-rose-400"></i>
+          </div>
+          <div class="my-1.5 flex items-baseline gap-1">
+            <span id="val-leak" class="text-xl font-bold text-rose-400">0.0</span>
+            <span class="text-xs text-slate-400">ppm</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div id="bar-leak" class="bg-rose-500 h-full w-[0%] transition-all duration-200"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACOUSTIC SPECTRUM ANALYSIS MINI-BAR CHART -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="bar-chart-2" class="w-4 h-4 text-cyan-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Acoustic Emission Spectrum Comparison (Zone A–D)</h3>
+          </div>
+          <span class="text-[11px] text-slate-400">Threshold: &gt;8.0 dB (Warn) / &gt;12.0 dB (Crit)</span>
+        </div>
+        <div class="grid grid-cols-4 gap-3 pt-1">
+          <!-- Zone A bar -->
+          <div class="flex flex-col items-center gap-1.5">
+            <div class="h-20 w-full bg-slate-950 rounded-lg p-1 flex items-end">
+              <div id="bar-ac-A" class="w-full bg-emerald-500 rounded transition-all duration-200 h-[25%]"></div>
+            </div>
+            <span class="text-[11px] font-bold text-slate-300">Zone A</span>
+            <span id="val-ac-A" class="text-xs font-mono text-emerald-400">5.1 dB</span>
+          </div>
+          <!-- Zone B bar -->
+          <div class="flex flex-col items-center gap-1.5">
+            <div class="h-20 w-full bg-slate-950 rounded-lg p-1 flex items-end">
+              <div id="bar-ac-B" class="w-full bg-emerald-500 rounded transition-all duration-200 h-[26%]"></div>
+            </div>
+            <span class="text-[11px] font-bold text-slate-300">Zone B</span>
+            <span id="val-ac-B" class="text-xs font-mono text-emerald-400">5.3 dB</span>
+          </div>
+          <!-- Zone C bar (Spiking) -->
+          <div class="flex flex-col items-center gap-1.5">
+            <div class="h-20 w-full bg-slate-950 rounded-lg p-1 flex items-end">
+              <div id="bar-ac-C" class="w-full bg-emerald-500 rounded transition-all duration-200 h-[26%]"></div>
+            </div>
+            <span class="text-[11px] font-bold text-slate-300">Zone C</span>
+            <span id="val-ac-C" class="text-xs font-mono text-emerald-400 font-bold">5.3 dB</span>
+          </div>
+          <!-- Zone D bar -->
+          <div class="flex flex-col items-center gap-1.5">
+            <div class="h-20 w-full bg-slate-950 rounded-lg p-1 flex items-end">
+              <div id="bar-ac-D" class="w-full bg-emerald-500 rounded transition-all duration-200 h-[28%]"></div>
+            </div>
+            <span class="text-[11px] font-bold text-slate-300">Zone D</span>
+            <span id="val-ac-D" class="text-xs font-mono text-emerald-400">5.6 dB</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: Strip-Charts + Decision Matrix + Event Log (5 cols) -->
+    <div class="lg:col-span-5 flex flex-col gap-4">
+
+      <!-- HISTORICAL STRIP-CHARTS (Synchronized Chart.js) -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 shadow-xl flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="trending-up" class="w-4 h-4 text-cyan-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Real-Time Telemetry Strip-Charts</h3>
+          </div>
+          <span class="text-[10px] text-slate-400">Synchronized Time-Series</span>
+        </div>
+
+        <!-- Chart 1: Pressures -->
+        <div>
+          <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+            <span>Tank & Annular Pressure (bar)</span>
+            <div class="flex items-center gap-3 text-[10px]">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span>Tank Press</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-400"></span>Annular Press</span>
+            </div>
+          </div>
+          <div class="h-32 w-full bg-slate-950 rounded-lg p-1">
+            <canvas id="chart-pressure"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: Leak & Strain -->
+        <div>
+          <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+            <span>H2 Leak (ppm) & Strain (µε)</span>
+            <div class="flex items-center gap-3 text-[10px]">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-400"></span>Leak (ppm)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Strain (µε)</span>
+            </div>
+          </div>
+          <div class="h-32 w-full bg-slate-950 rounded-lg p-1">
+            <canvas id="chart-leak-strain"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- SENSOR FUSION DECISION MATRIX -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 shadow-xl">
+        <div class="flex items-center gap-2 border-b border-slate-800 pb-2 mb-2.5">
+          <i data-lucide="git-branch" class="w-4 h-4 text-cyan-400"></i>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Sensor Fusion Decision Matrix</h3>
+        </div>
+        <div class="space-y-2 text-xs">
+          <!-- Gate 1 -->
+          <div id="gate-1" class="p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all">
+            <span id="gate-1-chk" class="text-slate-600 font-bold">[  ]</span>
+            <div class="flex-1">
+              <div class="flex items-center justify-between font-bold">
+                <span id="gate-1-title" class="text-slate-400">Single Anomaly Detection</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">→ WARNING</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Zone C Acoustic Emission &gt; 8.0 dB without initial pressure loss.</p>
+            </div>
+          </div>
+
+          <!-- Gate 2 -->
+          <div id="gate-2" class="p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all">
+            <span id="gate-2-chk" class="text-slate-600 font-bold">[  ]</span>
+            <div class="flex-1">
+              <div class="flex items-center justify-between font-bold">
+                <span id="gate-2-title" class="text-slate-400">Multi-Sensor Correlation</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">→ CRITICAL</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Concurrent Acoustic spike + H2 Leak detected (&gt;20 ppm) + Structural Strain spike (&gt;125 µε).</p>
+            </div>
+          </div>
+
+          <!-- Gate 3 -->
+          <div id="gate-3" class="p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all">
+            <span id="gate-3-chk" class="text-slate-600 font-bold">[  ]</span>
+            <div class="flex-1">
+              <div class="flex items-center justify-between font-bold">
+                <span id="gate-3-title" class="text-slate-400">Automatic Solenoid Trip Signal</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">→ ISOLATED</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Rapid safety shutoff valve actuation to seal tank boundary and isolate downstream line.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TERMINAL-STYLE LIVE EVENT LOG -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 shadow-xl flex flex-col flex-1">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="terminal" class="w-4 h-4 text-cyan-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Terminal Live Event Log</h3>
+          </div>
+          <span class="text-[10px] text-emerald-400 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LOGGING ACTIVE
+          </span>
+        </div>
+        <div id="event-log-container" class="h-44 overflow-y-auto custom-scroll bg-slate-950 rounded-lg p-2.5 text-[11px] font-mono space-y-1.5 text-slate-400 border border-slate-900">
+          <div class="text-slate-500">[00:00:00] SYSTEM INITIALIZED. Telemetry polling at 1Hz...</div>
+          <div class="text-emerald-400">[00:00:00] [NORMAL] Composite vessel baseline nominal. All valves open.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // RAW CSV EMBEDDED DATA (T=0s to T=180s)
+    const RAW_CSV = `Time_sec,Temperature_C,Pressure_bar,Strain_ue,Leak_ppm,Acoustic_A_dB,Acoustic_B_dB,Acoustic_C_dB,Acoustic_D_dB,Annular_Press_bar,System_Status,Valve_Status,WiFi_Status
+0,24.89,1.022,99.2,0.0,5.1,5.3,5.3,5.6,1.014,Normal,Open,Connected
+1,23.94,1.006,99.8,0.0,4.0,6.5,3.1,5.6,1.003,Normal,Open,Connected
+2,25.02,0.962,100.9,0.0,4.6,3.7,4.9,4.4,1.007,Normal,Open,Connected
+3,25.04,1.006,100.2,0.0,6.1,3.8,4.8,2.8,0.999,Normal,Open,Connected
+4,24.9,0.945,100.1,0.0,5.2,5.2,4.1,4.7,1.008,Normal,Open,Connected
+5,25.31,1.025,101.8,0.0,5.4,5.9,5.4,4.4,1.003,Normal,Open,Connected
+6,23.83,1.064,98.9,0.0,4.2,3.8,4.3,3.3,1.004,Normal,Open,Connected
+7,24.69,0.987,100.5,0.0,5.4,5.8,5.4,5.2,1.001,Normal,Open,Connected
+8,24.25,1.033,100.1,0.0,5.0,3.5,4.9,3.9,1.009,Normal,Open,Connected
+9,24.76,1.088,100.5,0.0,3.8,4.9,4.8,4.8,0.99,Normal,Open,Connected
+10,24.98,1.034,99.8,0.0,5.0,5.9,6.0,5.9,1.007,Normal,Open,Connected
+11,26.56,1.06,98.6,0.0,7.2,5.3,4.0,5.1,0.994,Normal,Open,Connected
+12,23.92,1.004,98.1,0.0,4.8,4.6,4.6,4.3,0.994,Normal,Open,Connected
+13,25.33,1.003,98.7,0.0,4.3,5.3,4.4,4.0,0.993,Normal,Open,Connected
+14,24.79,0.989,103.8,0.0,4.5,6.8,7.1,3.0,1.005,Normal,Open,Connected
+15,24.55,1.0,99.3,0.0,5.8,5.6,4.4,7.7,1.031,Normal,Open,Connected
+16,24.7,0.974,101.4,0.0,6.5,3.8,5.4,5.4,0.992,Normal,Open,Connected
+17,24.94,0.953,100.6,0.0,5.4,3.4,5.8,4.6,0.989,Normal,Open,Connected
+18,24.86,0.93,101.5,0.0,4.3,4.7,5.0,7.0,0.989,Normal,Open,Connected
+19,24.67,0.98,100.5,0.0,5.6,3.2,5.6,4.2,1.013,Normal,Open,Connected
+20,25.21,0.938,98.8,0.0,3.7,4.3,5.9,6.2,1.016,Normal,Open,Connected
+21,25.19,1.073,98.0,0.0,4.9,4.7,5.3,4.9,1.006,Normal,Open,Connected
+22,24.57,1.008,101.2,0.0,4.5,5.9,4.3,3.3,1.0,Normal,Open,Connected
+23,24.14,0.934,102.0,0.0,7.2,5.5,5.8,4.1,1.002,Normal,Open,Connected
+24,25.04,0.981,99.2,0.0,4.2,5.0,3.3,3.8,1.01,Normal,Open,Connected
+25,24.84,1.045,100.6,0.0,3.5,3.8,6.4,4.1,1.003,Normal,Open,Connected
+26,25.29,0.913,100.6,0.0,4.2,7.0,4.9,6.0,0.989,Normal,Open,Connected
+27,25.31,1.063,101.5,0.0,8.2,4.2,5.2,3.0,1.005,Normal,Open,Connected
+28,24.72,0.973,103.7,0.0,5.0,6.6,3.5,6.3,1.004,Normal,Open,Connected
+29,24.46,0.971,101.4,0.0,6.5,4.3,5.1,5.6,1.015,Normal,Open,Connected
+30,25.09,0.957,98.4,0.0,5.8,5.7,3.2,6.1,1.002,Normal,Open,Connected
+31,24.81,0.975,99.1,0.0,6.6,4.5,5.1,4.7,0.998,Normal,Open,Connected
+32,25.13,1.004,98.6,0.0,4.6,5.3,7.0,2.7,0.993,Normal,Open,Connected
+33,25.15,1.02,97.2,0.0,5.9,4.8,5.0,5.3,1.006,Normal,Open,Connected
+34,25.48,1.029,100.3,0.0,5.2,6.0,2.2,5.7,1.001,Normal,Open,Connected
+35,25.21,1.051,98.2,0.0,4.2,3.6,5.4,4.5,1.011,Normal,Open,Connected
+36,25.38,0.916,99.1,0.0,4.3,5.2,4.4,3.7,0.999,Normal,Open,Connected
+37,25.01,1.089,102.0,0.0,5.8,5.0,5.0,5.7,1.011,Normal,Open,Connected
+38,24.36,0.984,104.6,0.0,5.4,4.2,4.4,7.7,0.986,Normal,Open,Connected
+39,25.35,1.026,99.8,0.0,4.6,3.8,4.7,4.4,0.991,Normal,Open,Connected
+40,24.08,1.1,95.5,0.0,2.7,3.7,4.1,4.8,0.993,Normal,Open,Connected
+41,24.99,1.014,101.6,0.0,4.1,3.0,4.2,3.8,1.0,Normal,Open,Connected
+42,24.88,1.061,100.5,0.0,7.1,4.0,6.2,5.2,1.011,Normal,Open,Connected
+43,25.35,0.935,103.9,0.0,5.2,5.3,3.9,4.4,1.007,Normal,Open,Connected
+44,25.04,0.937,96.4,0.0,2.7,3.4,3.3,2.9,0.992,Normal,Open,Connected
+45,25.68,1.02,100.3,0.0,5.7,6.1,6.1,4.3,1.008,Normal,Open,Connected
+46,25.23,0.97,99.5,0.0,4.6,2.9,3.1,4.5,0.992,Normal,Open,Connected
+47,24.66,0.942,99.6,0.0,6.0,4.8,3.5,4.4,0.995,Normal,Open,Connected
+48,25.35,1.074,100.2,0.0,3.8,5.5,4.9,6.4,0.992,Normal,Open,Connected
+49,24.36,1.024,101.5,0.0,4.5,5.8,5.4,5.4,1.002,Normal,Open,Connected
+50,25.83,0.962,102.9,0.0,5.4,5.0,5.3,5.0,0.979,Normal,Open,Connected
+51,25.15,0.999,101.7,0.0,5.1,3.2,5.1,4.4,0.988,Normal,Open,Connected
+52,25.26,1.028,99.6,0.0,3.7,4.3,5.7,5.5,0.99,Normal,Open,Connected
+53,24.17,0.917,101.3,0.0,5.5,4.9,3.6,6.2,1.005,Normal,Open,Connected
+54,25.53,0.969,104.0,0.0,4.6,6.3,4.7,4.7,0.995,Normal,Open,Connected
+55,24.26,0.951,96.1,0.0,4.5,4.6,4.0,3.6,0.985,Normal,Open,Connected
+56,23.76,1.023,100.2,0.0,3.8,5.0,5.3,6.0,1.006,Normal,Open,Connected
+57,23.96,1.024,101.5,0.0,4.5,8.2,3.1,3.8,1.007,Normal,Open,Connected
+58,25.11,0.954,101.8,0.0,5.3,4.9,4.1,5.7,1.002,Normal,Open,Connected
+59,25.1,1.011,101.7,0.0,6.6,6.7,4.2,5.0,1.015,Normal,Open,Connected
+60,25.57,1.018,100.1,0.0,3.8,4.4,3.5,4.7,0.998,Normal,Open,Connected
+61,24.51,1.005,98.7,0.0,5.2,5.7,4.9,5.3,0.997,Normal,Open,Connected
+62,23.9,0.923,95.0,0.0,6.4,4.2,1.2,5.7,1.009,Normal,Open,Connected
+63,25.76,1.058,107.3,0.0,4.4,4.4,3.5,6.9,1.01,Normal,Open,Connected
+64,24.97,1.025,90.2,0.0,5.7,4.8,2.7,4.2,1.001,Normal,Open,Connected
+65,25.51,0.921,95.6,0.0,4.4,4.2,8.4,3.6,1.014,Normal,Open,Connected
+66,25.92,0.99,103.7,0.0,4.0,4.8,9.1,6.2,1.011,Normal,Open,Connected
+67,25.75,1.043,100.9,0.0,4.3,4.7,3.7,4.8,0.997,Normal,Open,Connected
+68,24.88,0.956,105.0,0.0,5.0,4.4,5.1,5.3,1.011,Normal,Open,Connected
+69,25.73,1.105,102.3,0.0,5.3,3.3,6.2,6.3,1.019,Normal,Open,Connected
+70,25.54,1.061,105.7,0.0,6.4,6.5,9.6,4.8,1.007,Normal,Open,Connected
+71,25.35,0.974,109.3,0.0,4.7,3.7,8.2,4.5,0.997,Normal,Open,Connected
+72,24.85,1.026,101.7,0.0,4.1,4.1,8.0,6.9,0.998,Normal,Open,Connected
+73,25.58,0.99,108.0,0.0,6.4,6.4,6.3,4.3,1.0,Normal,Open,Connected
+74,25.7,1.007,102.5,0.0,3.1,5.7,7.7,4.2,0.983,Normal,Open,Connected
+75,26.34,0.933,110.5,0.0,3.3,4.7,7.0,6.0,0.998,Warning,Open,Connected
+76,25.75,0.933,104.1,0.0,5.0,5.4,6.5,6.8,1.002,Normal,Open,Connected
+77,25.36,0.963,109.5,0.0,5.9,5.4,5.8,5.7,0.991,Normal,Open,Connected
+78,25.93,1.007,119.8,0.0,4.4,5.5,6.4,4.8,1.004,Warning,Open,Connected
+79,26.58,0.974,109.6,0.0,4.5,4.6,7.2,3.7,1.004,Normal,Open,Connected
+80,25.57,1.123,110.3,0.0,4.7,5.0,7.5,5.5,0.996,Warning,Open,Connected
+81,25.9,1.022,114.0,0.0,5.0,3.8,8.8,6.8,1.017,Warning,Open,Connected
+82,25.85,1.055,105.6,0.0,4.1,4.2,8.4,6.2,0.992,Normal,Open,Connected
+83,26.04,1.021,97.2,0.0,3.9,4.6,10.8,5.8,0.992,Warning,Open,Connected
+84,24.28,1.056,115.8,0.0,4.0,6.5,6.8,5.8,0.997,Warning,Open,Connected
+85,26.13,0.937,104.1,0.0,5.4,5.5,9.8,4.6,0.995,Normal,Open,Connected
+86,25.79,1.153,109.8,0.0,4.0,7.1,6.2,3.0,0.997,Normal,Open,Connected
+87,26.74,0.926,112.6,0.0,5.0,5.6,8.8,4.4,1.007,Warning,Open,Connected
+88,26.9,1.017,112.0,0.0,3.3,3.5,7.8,5.5,1.013,Warning,Open,Connected
+89,26.61,1.0,111.2,0.0,5.0,5.8,6.0,7.5,1.012,Warning,Open,Connected
+90,26.75,1.019,115.1,0.0,5.1,4.6,7.7,7.0,1.008,Warning,Open,Connected
+91,26.58,0.918,113.4,0.0,6.8,4.5,11.0,5.2,1.016,Warning,Open,Connected
+92,27.43,1.145,111.7,0.0,5.0,5.7,11.2,5.2,0.991,Warning,Open,Connected
+93,25.56,1.059,111.2,0.0,3.5,5.9,6.5,5.1,0.997,Warning,Open,Connected
+94,26.92,1.075,117.9,0.0,4.5,4.7,10.3,5.4,0.999,Warning,Open,Connected
+95,26.15,0.965,118.0,0.0,5.9,4.3,9.8,3.9,0.997,Warning,Open,Connected
+96,27.78,1.09,116.8,0.0,5.6,5.0,9.9,4.7,1.009,Warning,Open,Connected
+97,26.62,0.919,128.2,0.0,6.6,5.9,14.1,5.9,1.008,Warning,Open,Connected
+98,26.61,0.966,122.0,0.0,5.6,5.1,8.9,6.3,1.019,Warning,Open,Connected
+99,26.62,0.995,118.6,0.0,4.3,2.9,10.8,4.1,1.001,Warning,Open,Connected
+100,26.07,0.981,118.7,0.0,5.4,4.2,7.4,3.6,0.982,Warning,Open,Connected
+101,26.93,1.046,117.7,0.0,3.9,6.9,4.8,4.9,1.007,Warning,Open,Connected
+102,26.75,0.972,108.6,0.0,5.1,4.7,11.5,4.1,1.008,Warning,Open,Connected
+103,26.96,0.962,111.4,0.0,4.7,5.3,9.1,3.4,1.003,Warning,Open,Connected
+104,26.04,0.956,116.3,0.0,4.1,4.2,9.2,6.1,1.0,Warning,Open,Connected
+105,27.02,1.154,121.0,0.0,5.1,5.4,10.5,4.7,1.018,Warning,Open,Connected
+106,27.06,0.966,118.1,0.0,6.1,5.1,9.0,5.5,0.996,Warning,Open,Connected
+107,26.71,1.019,124.5,0.0,6.3,4.2,11.9,6.3,0.987,Warning,Open,Connected
+108,26.29,0.988,117.1,0.0,6.1,4.3,11.3,4.5,0.993,Warning,Open,Connected
+109,27.24,1.094,109.6,0.0,5.2,6.2,11.2,2.9,1.003,Warning,Open,Connected
+110,27.47,1.056,113.6,0.0,4.3,5.2,12.6,5.9,1.0,Warning,Open,Connected
+111,26.35,1.11,123.7,0.0,3.4,4.2,10.3,5.3,1.006,Warning,Open,Connected
+112,28.45,1.052,113.6,0.0,6.2,6.0,11.5,5.7,1.008,Warning,Open,Connected
+113,26.94,0.948,120.4,0.0,6.4,6.0,10.2,6.6,1.005,Warning,Open,Connected
+114,28.27,0.952,119.9,0.0,3.4,5.8,13.5,5.2,0.998,Warning,Open,Connected
+115,27.07,1.002,125.5,0.0,5.8,4.5,11.1,6.5,1.011,Warning,Open,Connected
+116,29.2,0.97,120.6,0.0,5.6,5.2,12.3,5.0,0.979,Warning,Open,Connected
+117,27.47,1.018,121.1,0.0,5.7,3.9,12.7,5.3,1.019,Warning,Open,Connected
+118,27.24,0.992,133.5,0.0,4.9,5.1,11.6,5.2,0.987,Warning,Open,Connected
+119,27.35,1.099,123.4,0.0,3.5,6.9,12.4,5.2,1.021,Warning,Open,Connected
+120,27.31,0.999,124.8,0.0,7.1,6.6,12.0,3.1,1.005,Warning,Open,Connected
+121,26.85,1.035,116.8,1.8,4.5,5.0,14.1,5.7,1.013,Warning,Open,Connected
+122,27.72,1.039,127.8,13.0,5.9,4.0,12.7,6.2,0.995,Warning,Open,Connected
+123,27.2,0.999,117.7,2.1,5.1,5.7,12.8,5.7,1.004,Warning,Open,Connected
+124,27.97,0.955,129.0,2.2,3.2,5.6,13.4,5.5,0.986,Warning,Open,Connected
+125,27.31,0.95,128.6,13.3,4.7,6.3,16.9,5.1,1.004,Warning,Open,Connected
+126,27.16,1.04,127.8,0.0,5.3,4.8,13.8,3.8,0.995,Warning,Open,Connected
+127,27.67,1.044,121.0,9.6,3.4,3.0,12.6,5.7,0.992,Warning,Open,Connected
+128,27.74,0.953,137.9,15.0,3.0,4.2,10.6,4.0,1.03,Warning,Open,Connected
+129,27.86,0.988,131.3,3.6,5.9,4.6,11.3,5.5,0.988,Warning,Open,Connected
+130,27.62,0.911,130.3,10.0,5.6,4.6,13.4,5.4,1.019,Warning,Open,Connected
+131,28.03,0.983,126.6,21.3,5.1,5.7,16.3,3.7,1.028,Critical,Open,Connected
+132,28.45,0.987,135.9,12.4,5.7,3.8,13.3,2.1,1.004,Warning,Open,Connected
+133,27.97,0.979,125.2,20.4,3.3,3.7,15.5,3.5,1.028,Critical,Open,Connected
+134,28.46,1.045,131.6,19.3,2.7,3.7,12.9,5.0,1.037,Warning,Open,Connected
+135,27.4,1.016,128.5,17.3,4.8,5.9,13.2,5.8,1.034,Warning,Open,Connected
+136,28.57,0.958,138.2,22.1,5.5,3.8,11.2,6.0,1.026,Critical,Open,Connected
+137,27.81,0.92,136.8,27.6,5.3,4.6,16.9,5.3,1.027,Critical,Open,Connected
+138,28.79,0.935,140.5,29.0,4.8,5.3,11.8,6.1,1.03,Critical,Open,Connected
+139,27.66,1.01,130.8,32.1,4.3,6.5,16.1,3.6,1.02,Critical,Open,Connected
+140,28.5,0.976,140.7,34.9,3.8,3.0,14.0,4.5,1.03,Critical,Open,Connected
+141,28.1,0.976,140.7,31.6,4.8,5.9,4.4,5.6,1.031,Isolated,Closed,Connected
+142,28.8,0.976,140.2,28.6,4.3,4.7,4.9,5.1,1.042,Isolated,Closed,Connected
+143,28.59,0.976,139.7,25.9,5.1,6.0,5.2,3.5,1.043,Isolated,Closed,Connected
+144,28.43,0.976,139.2,23.4,5.2,6.4,5.5,5.0,1.033,Isolated,Closed,Connected
+145,28.38,0.976,138.7,21.2,4.4,5.1,5.8,5.8,1.038,Isolated,Closed,Connected
+146,27.92,0.976,138.2,19.2,4.9,6.2,3.8,4.6,1.042,Isolated,Closed,Connected
+147,28.09,0.976,137.7,17.3,4.2,5.1,4.7,3.2,1.034,Isolated,Closed,Connected
+148,29.13,0.976,137.1,15.7,3.9,5.3,4.8,3.8,1.047,Isolated,Closed,Connected
+149,28.59,0.976,136.6,14.2,6.7,5.3,5.5,4.7,1.052,Isolated,Closed,Connected
+150,28.6,0.976,136.1,12.8,6.6,5.1,6.4,4.6,1.037,Isolated,Closed,Connected
+151,28.39,0.976,135.6,11.6,4.5,5.0,4.3,5.6,1.034,Isolated,Closed,Connected
+152,28.83,0.976,135.1,10.5,5.4,4.5,4.5,5.1,1.042,Isolated,Closed,Connected
+153,29.35,0.976,134.6,9.5,6.0,6.0,3.6,5.0,1.051,Isolated,Closed,Connected
+154,29.39,0.976,134.1,8.6,6.1,5.3,5.7,4.0,1.055,Isolated,Closed,Connected
+155,29.28,0.976,133.6,7.8,4.6,3.4,4.1,5.8,1.053,Isolated,Closed,Connected
+156,29.35,0.976,133.0,7.0,2.9,4.5,5.3,4.5,1.047,Isolated,Closed,Connected
+157,28.67,0.976,132.5,6.4,4.2,6.3,5.7,5.5,1.063,Isolated,Closed,Connected
+158,29.08,0.976,132.0,5.8,4.5,6.0,4.9,5.8,1.053,Isolated,Closed,Connected
+159,29.23,0.976,131.5,5.2,5.4,5.5,4.1,3.1,1.071,Isolated,Closed,Connected
+160,28.36,0.976,131.0,4.7,5.7,3.3,6.0,5.2,1.078,Isolated,Closed,Connected
+161,29.68,0.976,130.5,4.3,5.7,6.1,4.7,4.4,1.068,Isolated,Closed,Connected
+162,29.11,0.976,130.0,3.9,4.3,4.1,4.7,4.3,1.065,Isolated,Closed,Connected
+163,29.13,0.976,129.5,3.5,4.7,6.0,4.4,4.7,1.05,Isolated,Closed,Connected
+164,30.36,0.976,128.9,3.2,5.6,4.7,7.0,4.7,1.059,Isolated,Closed,Connected
+165,28.94,0.976,128.4,2.9,4.0,5.2,5.5,5.2,1.063,Isolated,Closed,Connected
+166,30.33,0.976,127.9,2.6,4.9,5.8,5.4,5.1,1.079,Isolated,Closed,Connected
+167,29.3,0.976,127.4,2.3,5.2,4.2,4.2,5.0,1.086,Isolated,Closed,Connected
+168,29.11,0.976,126.9,2.1,4.7,5.8,5.8,5.2,1.068,Isolated,Closed,Connected
+169,28.59,0.976,126.4,1.9,4.5,4.1,3.9,5.3,1.077,Isolated,Closed,Connected
+170,29.38,0.976,125.9,1.7,5.4,5.0,7.1,4.5,1.09,Isolated,Closed,Connected
+171,30.14,0.976,125.3,1.6,6.4,5.4,6.1,6.1,1.096,Isolated,Closed,Connected
+172,30.25,0.976,124.8,1.4,5.8,6.0,5.2,4.9,1.083,Isolated,Closed,Connected
+173,30.02,0.976,124.3,1.3,3.6,6.6,2.6,5.7,1.084,Isolated,Closed,Connected
+174,29.6,0.976,123.8,1.2,3.6,6.0,4.6,4.6,1.097,Isolated,Closed,Connected
+175,29.39,0.976,123.3,1.1,5.3,6.0,2.8,4.6,1.098,Isolated,Closed,Connected
+176,29.18,0.976,122.8,1.0,4.5,4.8,5.6,6.4,1.082,Isolated,Closed,Connected
+177,29.56,0.976,122.3,0.9,3.6,4.7,6.7,5.2,1.089,Isolated,Closed,Connected
+178,29.51,0.976,121.8,0.8,6.1,6.3,5.5,5.3,1.104,Isolated,Closed,Connected
+179,29.22,0.976,121.2,0.7,4.7,5.0,5.7,4.5,1.103,Isolated,Closed,Connected
+180,29.0,0.976,120.7,0.6,4.9,4.4,5.8,4.4,1.089,Isolated,Closed,Connected`;
+
+    // Data Store & State
+    let telemetryData = [];
+    let currentIndex = 0;
+    let isPlaying = false;
+    let playbackSpeed = 1;
+    let playbackInterval = null;
+    let chartPressure = null;
+    let chartLeakStrain = null;
+    let eventLogs = [];
+    let lastLoggedStatus = null;
+    let lastLoggedValve = null;
+
+    // Parse CSV function
+    function parseCSV(csvText) {
+      const lines = csvText.trim().split('\n');
+      if (lines.length < 2) return [];
+      const headers = lines[0].split(',').map(h => h.trim());
+      const data = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const values = line.split(',');
+        const row = {};
+        headers.forEach((header, idx) => {
+          const val = values[idx] ? values[idx].trim() : '';
+          if (['System_Status', 'Valve_Status', 'WiFi_Status'].includes(header)) {
+            row[header] = val;
+          } else {
+            row[header] = parseFloat(val) || 0;
+          }
+        });
+        data.push(row);
+      }
+      return data;
+    }
+
+    // Initialize Chart.js
+    function initCharts() {
+      const chartDefaults = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 0 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleColor: '#94a3b8',
+            bodyFont: { family: 'monospace' }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: '#1e293b' },
+            ticks: { color: '#64748b', font: { size: 9, family: 'monospace' }, maxTicksLimit: 8 }
+          },
+          y: {
+            grid: { color: '#1e293b' },
+            ticks: { color: '#64748b', font: { size: 9, family: 'monospace' } }
+          }
+        }
+      };
+
+      // Chart 1: Pressures
+      const ctxPress = document.getElementById('chart-pressure').getContext('2d');
+      chartPressure = new Chart(ctxPress, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Tank Press (bar)',
+              data: [],
+              borderColor: '#22d3ee',
+              backgroundColor: 'rgba(34, 211, 238, 0.1)',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.1
+            },
+            {
+              label: 'Annular Press (bar)',
+              data: [],
+              borderColor: '#818cf8',
+              backgroundColor: 'rgba(129, 140, 248, 0.1)',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.1
+            }
+          ]
+        },
+        options: {
+          ...chartDefaults,
+          scales: {
+            ...chartDefaults.scales,
+            y: {
+              ...chartDefaults.scales.y,
+              suggestedMin: 0.88,
+              suggestedMax: 1.15
+            }
+          }
+        }
+      });
+
+      // Chart 2: Leak & Strain
+      const ctxLeakStrain = document.getElementById('chart-leak-strain').getContext('2d');
+      chartLeakStrain = new Chart(ctxLeakStrain, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'H2 Leak (ppm)',
+              data: [],
+              borderColor: '#f43f5e',
+              backgroundColor: 'rgba(244, 63, 94, 0.1)',
+              borderWidth: 2,
+              pointRadius: 0,
+              yAxisID: 'yLeak',
+              tension: 0.2
+            },
+            {
+              label: 'Strain (µε)',
+              data: [],
+              borderColor: '#fbbf24',
+              backgroundColor: 'rgba(251, 191, 36, 0.05)',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              yAxisID: 'yStrain',
+              tension: 0.1
+            }
+          ]
+        },
+        options: {
+          ...chartDefaults,
+          scales: {
+            x: chartDefaults.scales.x,
+            yLeak: {
+              type: 'linear',
+              position: 'left',
+              grid: { color: '#1e293b' },
+              ticks: { color: '#f43f5e', font: { size: 9, family: 'monospace' } },
+              suggestedMin: 0,
+              suggestedMax: 40
+            },
+            yStrain: {
+              type: 'linear',
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              ticks: { color: '#fbbf24', font: { size: 9, family: 'monospace' } },
+              suggestedMin: 90,
+              suggestedMax: 145
+            }
+          }
+        }
+      });
+    }
+
+    // Append to Event Log
+    function addEventLog(timeSec, tag, message, level = 'info') {
+      const logContainer = document.getElementById('event-log-container');
+      const timeStr = `T+${String(timeSec).padStart(3, '0')}s`;
+      let colorClass = 'text-slate-400';
+      if (level === 'warn') colorClass = 'text-amber-400';
+      if (level === 'crit') colorClass = 'text-rose-400 font-bold';
+      if (level === 'iso') colorClass = 'text-indigo-300 font-bold';
+      if (level === 'success') colorClass = 'text-emerald-400';
+
+      const entry = document.createElement('div');
+      entry.className = `${colorClass} leading-tight`;
+      entry.innerHTML = `<span class="text-slate-600">[${timeStr}]</span> <span class="uppercase">[${tag}]</span> ${message}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    // Reset Event Log to current index
+    function rebuildEventLogs(targetIndex) {
+      const logContainer = document.getElementById('event-log-container');
+      logContainer.innerHTML = '';
+      addEventLog(0, 'INIT', 'H2-Shield™ safety supervisor online. Polling 13-channel bus.', 'info');
+      addEventLog(0, 'NORMAL', 'Baseline normal. Solenoid valves open, structural integrity nominal.', 'success');
+
+      for (let i = 1; i <= targetIndex; i++) {
+        const row = telemetryData[i];
+        const prev = telemetryData[i - 1];
+
+        // Status change
+        if (row.System_Status !== prev.System_Status) {
+          if (row.System_Status === 'Warning') {
+            addEventLog(row.Time_sec, 'WARNING', `Acoustic anomaly in Zone C (${row.Acoustic_C_dB} dB). Elevated structural activity.`, 'warn');
+          } else if (row.System_Status === 'Critical') {
+            addEventLog(row.Time_sec, 'CRITICAL', `Multi-sensor correlation breach! Leak: ${row.Leak_ppm} ppm, Strain: ${row.Strain_ue} µε.`, 'crit');
+          } else if (row.System_Status === 'Isolated') {
+            addEventLog(row.Time_sec, 'ISOLATED', `Automatic solenoid isolation initiated. Valve closed at boundary.`, 'iso');
+          } else if (row.System_Status === 'Normal') {
+            addEventLog(row.Time_sec, 'NORMAL', `System metrics reverted to nominal thresholds.`, 'success');
+          }
+        }
+
+        // Valve change
+        if (row.Valve_Status !== prev.Valve_Status) {
+          if (row.Valve_Status === 'Closed') {
+            addEventLog(row.Time_sec, 'VALVE TRIP', 'Solenoid SV-101 CLOSED. Emergency Isolation Verified.', 'crit');
+          } else {
+            addEventLog(row.Time_sec, 'VALVE RESET', 'Solenoid SV-101 commanded OPEN.', 'info');
+          }
+        }
+      }
+    }
+
+    // Update telemetry state and UI elements
+    function updateUI(index) {
+      if (!telemetryData || telemetryData.length === 0) return;
+      if (index < 0) index = 0;
+      if (index >= telemetryData.length) index = telemetryData.length - 1;
+      currentIndex = index;
+
+      const row = telemetryData[currentIndex];
+      const t = row.Time_sec;
+
+      // 1. Clock & Scrubber
+      document.getElementById('sim-clock').textContent = `T+${String(t).padStart(2, '0')}s`;
+      document.getElementById('scrubber-slider').value = t;
+
+      // 2. System Status Badge
+      const sysBadge = document.getElementById('sys-status-badge');
+      const sysText = document.getElementById('sys-status-text');
+      sysBadge.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border transition-all duration-300 ";
+
+      if (row.System_Status === 'Normal') {
+        sysBadge.className += "bg-emerald-950/70 border-emerald-500/50 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.3)]";
+        sysText.textContent = "NORMAL";
+      } else if (row.System_Status === 'Warning') {
+        sysBadge.className += "bg-amber-950/70 border-amber-500/60 text-amber-400 shadow-[0_0_14px_rgba(245,158,11,0.3)]";
+        sysText.textContent = "WARNING";
+      } else if (row.System_Status === 'Critical') {
+        sysBadge.className += "bg-rose-950/80 border-rose-500 text-rose-300 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.5)]";
+        sysText.textContent = "CRITICAL";
+      } else if (row.System_Status === 'Isolated') {
+        sysBadge.className += "bg-indigo-950/70 border-indigo-500/60 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.3)]";
+        sysText.textContent = "ISOLATED";
+      }
+
+      // 3. Valve Status Badge & Graphics
+      const valveBadge = document.getElementById('valve-status-badge');
+      const valveText = document.getElementById('valve-status-text');
+      const valveTag = document.getElementById('valve-state-tag');
+      const valveSubtext = document.getElementById('valve-subtext');
+      const valveIndLight = document.getElementById('valve-indicator-light');
+      const valveGateL = document.getElementById('valve-gate-left');
+      const valveGateR = document.getElementById('valve-gate-right');
+
+      if (row.Valve_Status === 'Open') {
+        valveBadge.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border bg-emerald-950/60 border-emerald-500/50 text-emerald-400";
+        valveText.textContent = "VALVE OPEN";
+        document.getElementById('valve-badge-icon').setAttribute('data-lucide', 'unlock');
+
+        valveTag.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-700";
+        valveTag.textContent = "SOLENOID ENERGIZED (OPEN)";
+
+        valveSubtext.textContent = "SV-101 OPEN";
+        valveSubtext.setAttribute('fill', '#94a3b8');
+        valveIndLight.setAttribute('fill', '#10b981');
+        valveGateL.setAttribute('transform', 'translate(-4, 0)');
+        valveGateR.setAttribute('transform', 'translate(4, 0)');
+        valveGateL.setAttribute('fill', '#38bdf8');
+        valveGateR.setAttribute('fill', '#38bdf8');
+      } else {
+        valveBadge.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border bg-rose-950/80 border-rose-500/70 text-rose-300 shadow-[0_0_12px_rgba(239,68,68,0.4)]";
+        valveText.textContent = "VALVE CLOSED / ISOLATION VERIFIED";
+        document.getElementById('valve-badge-icon').setAttribute('data-lucide', 'lock');
+
+        valveTag.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-600 animate-pulse";
+        valveTag.textContent = "ISOLATION ACTIVE (CLOSED)";
+
+        valveSubtext.textContent = "SV-101 CLOSED";
+        valveSubtext.setAttribute('fill', '#f43f5e');
+        valveIndLight.setAttribute('fill', '#ef4444');
+        valveGateL.setAttribute('transform', 'translate(0, 0)');
+        valveGateR.setAttribute('transform', 'translate(0, 0)');
+        valveGateL.setAttribute('fill', '#ef4444');
+        valveGateR.setAttribute('fill', '#ef4444');
+      }
+
+      // 4. Safety Sequence Protocol Banner
+      // Stages: Monitor (T>=0), Detect (T>=61), Verify (T>=90), Localize (T>=110), Isolate (T>=131), Confirm (T>=141)
+      const seqKeys = ['monitor', 'detect', 'verify', 'localize', 'isolate', 'confirm'];
+      const activeStage = t >= 141 ? 'confirm' :
+                          t >= 131 ? 'isolate' :
+                          t >= 110 ? 'localize' :
+                          t >= 90 ? 'verify' :
+                          t >= 61 ? 'detect' : 'monitor';
+
+      seqKeys.forEach(k => {
+        const el = document.querySelector(`[data-seq="${k}"]`);
+        if (!el) return;
+        if (k === activeStage) {
+          el.className = "px-2.5 py-1 rounded border transition-all duration-300 bg-cyan-950/90 border-cyan-400 text-cyan-300 font-bold shadow-[0_0_12px_rgba(6,182,212,0.4)] ring-1 ring-cyan-400";
+        } else if (seqKeys.indexOf(k) < seqKeys.indexOf(activeStage)) {
+          el.className = "px-2.5 py-1 rounded border transition-all duration-300 bg-slate-900 border-slate-700 text-slate-300";
+        } else {
+          el.className = "px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-600";
+        }
+      });
+
+      // 5. Physical Tank Schematic: Zone C Anomaly Logic
+      const zoneC = document.getElementById('zone-C');
+      const dotC = document.getElementById('sensor-c-dot');
+      const lblC = document.getElementById('lbl-zone-C');
+
+      // Reset Zone C animation classes
+      zoneC.classList.remove('zone-pulse-amber', 'zone-strobe-red');
+
+      if (t >= 141) {
+        // Isolated / Sealed boundary state
+        zoneC.setAttribute('fill', '#6366f1');
+        zoneC.setAttribute('fill-opacity', '0.35');
+        zoneC.setAttribute('stroke', '#818cf8');
+        dotC.setAttribute('fill', '#818cf8');
+        lblC.setAttribute('fill', '#c7d2fe');
+        lblC.textContent = 'ZONE C (SEALED)';
+      } else if (t >= 121) {
+        // Critical: Strobe Red
+        zoneC.classList.add('zone-strobe-red');
+        dotC.setAttribute('fill', '#ef4444');
+        lblC.setAttribute('fill', '#fca5a5');
+        lblC.textContent = 'ZONE C (RUPTURE)';
+      } else if (t >= 61) {
+        // Warning: Pulse Amber
+        zoneC.classList.add('zone-pulse-amber');
+        dotC.setAttribute('fill', '#f59e0b');
+        lblC.setAttribute('fill', '#fde68a');
+        lblC.textContent = 'ZONE C (ANOMALY)';
+      } else {
+        // Normal: Calm emerald
+        zoneC.setAttribute('fill', '#10b981');
+        zoneC.setAttribute('fill-opacity', '0.12');
+        zoneC.setAttribute('stroke', '#10b981');
+        dotC.setAttribute('fill', '#34d399');
+        lblC.setAttribute('fill', '#6ee7b7');
+        lblC.textContent = 'ZONE C';
+      }
+
+      // Zone dB text readings on tank
+      document.getElementById('txt-zone-A').textContent = `${row.Acoustic_A_dB.toFixed(1)} dB`;
+      document.getElementById('txt-zone-B').textContent = `${row.Acoustic_B_dB.toFixed(1)} dB`;
+      document.getElementById('txt-zone-C').textContent = `${row.Acoustic_C_dB.toFixed(1)} dB`;
+      document.getElementById('txt-zone-D').textContent = `${row.Acoustic_D_dB.toFixed(1)} dB`;
+
+      // 6. Core Gauges Values & Progress Bars
+      document.getElementById('val-temp').textContent = row.Temperature_C.toFixed(2);
+      // Temp scale 20-35 C
+      const tempPct = Math.min(100, Math.max(0, ((row.Temperature_C - 20) / 15) * 100));
+      document.getElementById('bar-temp').style.width = `${tempPct}%`;
+
+      document.getElementById('val-press').textContent = row.Pressure_bar.toFixed(3);
+      // Pressure scale 0.8 to 1.2
+      const pressPct = Math.min(100, Math.max(0, ((row.Pressure_bar - 0.8) / 0.4) * 100));
+      document.getElementById('bar-press').style.width = `${pressPct}%`;
+
+      document.getElementById('val-annular').textContent = row.Annular_Press_bar.toFixed(3);
+      const annPct = Math.min(100, Math.max(0, ((row.Annular_Press_bar - 0.95) / 0.2) * 100));
+      document.getElementById('bar-annular').style.width = `${annPct}%`;
+
+      document.getElementById('val-strain').textContent = row.Strain_ue.toFixed(1);
+      // Strain scale 90 to 150 ue
+      const strainPct = Math.min(100, Math.max(0, ((row.Strain_ue - 90) / 60) * 100));
+      document.getElementById('bar-strain').style.width = `${strainPct}%`;
+
+      document.getElementById('val-leak').textContent = row.Leak_ppm.toFixed(1);
+      // Leak scale 0 to 40 ppm
+      const leakPct = Math.min(100, Math.max(0, (row.Leak_ppm / 40) * 100));
+      document.getElementById('bar-leak').style.width = `${leakPct}%`;
+      const leakCard = document.getElementById('card-leak');
+      if (row.Leak_ppm > 20) {
+        leakCard.className = "bg-rose-950/40 border border-rose-500/70 rounded-xl p-3 flex flex-col justify-between transition-colors duration-300";
+      } else if (row.Leak_ppm > 0) {
+        leakCard.className = "bg-amber-950/40 border border-amber-500/70 rounded-xl p-3 flex flex-col justify-between transition-colors duration-300";
+      } else {
+        leakCard.className = "bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between transition-colors duration-300";
+      }
+
+      // 7. Acoustic Spectrum Mini-Bar Chart (Zones A-D)
+      const maxAcoustic = 20; // 0 to 20 dB
+      ['A', 'B', 'C', 'D'].forEach(zone => {
+        const val = row[`Acoustic_${zone}_dB`];
+        const bar = document.getElementById(`bar-ac-${zone}`);
+        const valEl = document.getElementById(`val-ac-${zone}`);
+        valEl.textContent = `${val.toFixed(1)} dB`;
+        const pct = Math.min(100, Math.max(5, (val / maxAcoustic) * 100));
+        bar.style.height = `${pct}%`;
+
+        if (val >= 12.0) {
+          bar.className = "w-full bg-rose-500 rounded transition-all duration-200 shadow-[0_0_10px_rgba(244,63,94,0.6)]";
+          valEl.className = "text-xs font-mono text-rose-400 font-bold";
+        } else if (val >= 8.0) {
+          bar.className = "w-full bg-amber-400 rounded transition-all duration-200 shadow-[0_0_8px_rgba(251,191,36,0.5)]";
+          valEl.className = "text-xs font-mono text-amber-400 font-bold";
+        } else {
+          bar.className = "w-full bg-emerald-500 rounded transition-all duration-200";
+          valEl.className = "text-xs font-mono text-emerald-400";
+        }
+      });
+
+      // 8. Decision Matrix Logic Gates
+      // Gate 1: Single Anomaly (Zone C Acoustic >= 8.0 dB) -> Trigger WARNING
+      const g1Active = row.Acoustic_C_dB >= 8.0 || ['Warning', 'Critical', 'Isolated'].includes(row.System_Status);
+      const gate1 = document.getElementById('gate-1');
+      const g1chk = document.getElementById('gate-1-chk');
+      const g1title = document.getElementById('gate-1-title');
+      if (g1Active) {
+        gate1.className = "p-2.5 rounded-lg border border-amber-500/50 bg-amber-950/30 flex items-start gap-2.5 transition-all";
+        g1chk.className = "text-amber-400 font-bold";
+        g1chk.textContent = "[✓]";
+        g1title.className = "text-amber-300";
+      } else {
+        gate1.className = "p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all";
+        g1chk.className = "text-slate-600 font-bold";
+        g1chk.textContent = "[  ]";
+        g1title.className = "text-slate-400";
+      }
+
+      // Gate 2: Multi-Sensor Correlation (Acoustic + Leak + Strain) -> Trigger CRITICAL
+      const g2Active = (row.Leak_ppm > 10 && row.Strain_ue > 120) || ['Critical', 'Isolated'].includes(row.System_Status);
+      const gate2 = document.getElementById('gate-2');
+      const g2chk = document.getElementById('gate-2-chk');
+      const g2title = document.getElementById('gate-2-title');
+      if (g2Active) {
+        gate2.className = "p-2.5 rounded-lg border border-rose-500/50 bg-rose-950/40 flex items-start gap-2.5 transition-all";
+        g2chk.className = "text-rose-400 font-bold";
+        g2chk.textContent = "[✓]";
+        g2title.className = "text-rose-300";
+      } else {
+        gate2.className = "p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all";
+        g2chk.className = "text-slate-600 font-bold";
+        g2chk.textContent = "[  ]";
+        g2title.className = "text-slate-400";
+      }
+
+      // Gate 3: Automatic Solenoid Trip -> Trigger ISOLATED
+      const g3Active = row.Valve_Status === 'Closed' || row.System_Status === 'Isolated';
+      const gate3 = document.getElementById('gate-3');
+      const g3chk = document.getElementById('gate-3-chk');
+      const g3title = document.getElementById('gate-3-title');
+      if (g3Active) {
+        gate3.className = "p-2.5 rounded-lg border border-indigo-500/50 bg-indigo-950/40 flex items-start gap-2.5 transition-all";
+        g3chk.className = "text-indigo-400 font-bold";
+        g3chk.textContent = "[✓]";
+        g3title.className = "text-indigo-300";
+      } else {
+        gate3.className = "p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all";
+        g3chk.className = "text-slate-600 font-bold";
+        g3chk.textContent = "[  ]";
+        g3title.className = "text-slate-400";
+      }
+
+      // 9. Update Strip Charts
+      if (chartPressure && chartLeakStrain) {
+        const sliceData = telemetryData.slice(0, currentIndex + 1);
+        const labels = sliceData.map(d => `T+${d.Time_sec}`);
+
+        // Pressure Chart
+        chartPressure.data.labels = labels;
+        chartPressure.data.datasets[0].data = sliceData.map(d => d.Pressure_bar);
+        chartPressure.data.datasets[1].data = sliceData.map(d => d.Annular_Press_bar);
+        chartPressure.update('none');
+
+        // Leak & Strain Chart
+        chartLeakStrain.data.labels = labels;
+        chartLeakStrain.data.datasets[0].data = sliceData.map(d => d.Leak_ppm);
+        chartLeakStrain.data.datasets[1].data = sliceData.map(d => d.Strain_ue);
+        chartLeakStrain.update('none');
+      }
+
+      // 10. Update lucide icons in dynamic components
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    }
+
+    // Playback loop
+    function stepPlayback() {
+      if (currentIndex < telemetryData.length - 1) {
+        const prevStatus = telemetryData[currentIndex].System_Status;
+        const prevValve = telemetryData[currentIndex].Valve_Status;
+        currentIndex++;
+        updateUI(currentIndex);
+
+        const curRow = telemetryData[currentIndex];
+        // Check for live event log triggers
+        if (curRow.System_Status !== prevStatus) {
+          if (curRow.System_Status === 'Warning') {
+            addEventLog(curRow.Time_sec, 'WARNING', `Acoustic anomaly in Zone C (${curRow.Acoustic_C_dB} dB). Structural noise elevated.`, 'warn');
+          } else if (curRow.System_Status === 'Critical') {
+            addEventLog(curRow.Time_sec, 'CRITICAL', `Correlation threshold breached! H2 Leak: ${curRow.Leak_ppm} ppm, Strain: ${curRow.Strain_ue} µε.`, 'crit');
+          } else if (curRow.System_Status === 'Isolated') {
+            addEventLog(curRow.Time_sec, 'ISOLATED', `Automatic solenoid isolation initiated. Line sealed.`, 'iso');
+          }
+        }
+        if (curRow.Valve_Status !== prevValve && curRow.Valve_Status === 'Closed') {
+          addEventLog(curRow.Time_sec, 'VALVE TRIP', 'Solenoid SV-101 CLOSED. Emergency Isolation Verified.', 'crit');
+        }
+      } else {
+        pausePlayback();
+      }
+    }
+
+    function startPlayback() {
+      if (isPlaying) return;
+      isPlaying = true;
+      document.getElementById('play-pause-label').textContent = 'PAUSE';
+      document.getElementById('play-pause-icon').setAttribute('data-lucide', 'pause');
+      if (window.lucide) window.lucide.createIcons();
+
+      const intervalMs = Math.max(50, 1000 / playbackSpeed);
+      playbackInterval = setInterval(stepPlayback, intervalMs);
+    }
+
+    function pausePlayback() {
+      isPlaying = false;
+      document.getElementById('play-pause-label').textContent = 'PLAY';
+      document.getElementById('play-pause-icon').setAttribute('data-lucide', 'play');
+      if (window.lucide) window.lucide.createIcons();
+      if (playbackInterval) {
+        clearInterval(playbackInterval);
+        playbackInterval = null;
+      }
+    }
+
+    function resetPlayback() {
+      pausePlayback();
+      currentIndex = 0;
+      rebuildEventLogs(0);
+      updateUI(0);
+    }
+
+    // Set Speed
+    function setSpeed(speed) {
+      playbackSpeed = speed;
+      document.querySelectorAll('.speed-btn').forEach(btn => {
+        if (parseInt(btn.getAttribute('data-speed'), 10) === speed) {
+          btn.className = "speed-btn px-2.5 py-1 text-xs font-bold rounded bg-cyan-600 text-white";
+        } else {
+          btn.className = "speed-btn px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white";
+        }
+      });
+      if (isPlaying) {
+        clearInterval(playbackInterval);
+        const intervalMs = Math.max(50, 1000 / playbackSpeed);
+        playbackInterval = setInterval(stepPlayback, intervalMs);
+      }
+    }
+
+    // Bootstrapping
+    window.addEventListener('DOMContentLoaded', () => {
+      telemetryData = parseCSV(RAW_CSV);
+      initCharts();
+      rebuildEventLogs(0);
+      updateUI(0);
+
+      // Event Listeners
+      document.getElementById('btn-play-pause').addEventListener('click', () => {
+        if (isPlaying) pausePlayback();
+        else startPlayback();
+      });
+
+      document.getElementById('btn-reset').addEventListener('click', resetPlayback);
+
+      document.getElementById('scrubber-slider').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        currentIndex = val;
+        rebuildEventLogs(val);
+        updateUI(val);
+      });
+
+      document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const spd = parseInt(btn.getAttribute('data-speed'), 10);
+          setSpeed(spd);
+        });
+      });
+
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>
