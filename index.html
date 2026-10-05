@@ -1,466 +1,484 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>H2-Shield™ Safety System</title>
-  <meta name="description" content="H2-Shield™ mission-critical hydrogen tank safety and telemetry playback dashboard." />
+  <title>H2-Shield™ safety system</title>
+  <meta name="description" content="Type-IV hydrogen storage containment and automated isolation monitoring." />
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    @keyframes strobeRed {
-      0%, 100% { fill: rgba(239, 68, 68, 0.2); stroke: #ef4444; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.8)); }
-      50% { fill: rgba(239, 68, 68, 0.7); stroke: #fee2e2; filter: drop-shadow(0 0 25px rgba(239, 68, 68, 1)); }
+    *, ::before, ::after {
+      box-shadow: none !important;
+      text-shadow: none !important;
     }
-    @keyframes pulseAmber {
-      0%, 100% { fill: rgba(245, 158, 11, 0.2); stroke: #f59e0b; filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6)); }
-      50% { fill: rgba(245, 158, 11, 0.55); stroke: #fef3c7; filter: drop-shadow(0 0 18px rgba(245, 158, 11, 0.9)); }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #F8F9FA;
+      color: #1F2937;
     }
-    @keyframes pulseNormal {
-      0%, 100% { opacity: 0.8; }
-      50% { opacity: 1; }
+    .font-num {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-variant-numeric: tabular-nums;
     }
-    .zone-pulse-amber { animation: pulseAmber 1.2s infinite ease-in-out; }
-    .zone-strobe-red { animation: strobeRed 0.5s infinite ease-in-out; }
-    .custom-scroll::-webkit-scrollbar { width: 4px; }
-    .custom-scroll::-webkit-scrollbar-track { background: #0b1120; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+    .font-tabular {
+      font-variant-numeric: tabular-nums;
+    }
+    .h2-card {
+      background-color: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+    }
+    /* Scrubber custom track & thumb */
+    input[type=range].h2-scrubber {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: #E5E7EB;
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range].h2-scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #005C4B;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.1s ease;
+    }
+    input[type=range].h2-scrubber::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+    input[type=range].h2-scrubber::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #005C4B;
+      cursor: pointer;
+      border: none;
+    }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #F3F4F6; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
   </style>
 </head>
-<body class="bg-[#0B1120] text-slate-100 min-h-screen font-mono antialiased selection:bg-cyan-500 selection:text-white p-3 lg:p-5 flex flex-col gap-4">
+<body class="min-h-screen text-gray-800 antialiased selection:bg-[#005C4B] selection:text-white pb-12">
 
-  <!-- TOP HEADER / STATUS BAR -->
-  <header id="top-bar" class="bg-slate-900/80 border border-slate-800/80 rounded-xl p-3.5 backdrop-blur shadow-2xl flex flex-wrap items-center justify-between gap-4">
-    <div class="flex items-center gap-3">
-      <div class="p-2.5 bg-cyan-950/60 border border-cyan-500/40 rounded-lg text-cyan-400">
-        <i data-lucide="shield-alert" class="w-6 h-6"></i>
-      </div>
+  <!-- TOP HEADER -->
+  <header class="border-b border-gray-200 bg-white">
+    <div class="max-w-[1200px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
+      <!-- Title & Subtitle on left -->
       <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-lg font-bold tracking-wider text-slate-100 flex items-center gap-1.5">
-            H2-SHIELD<span class="text-cyan-400 text-xs px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-800">PRO-v4</span>
-          </h1>
-          <span class="text-[11px] text-slate-400 uppercase tracking-widest hidden sm:inline">| Type-IV Tank Telemetry</span>
+        <h1 class="text-[22px] font-bold text-gray-900 leading-tight">H2-Shield safety system</h1>
+        <p class="text-[13px] text-[#4B5563] mt-0.5">Type-IV vessel containment and automated isolation monitoring</p>
+      </div>
+
+      <!-- Time & Single Status Badge on right -->
+      <div class="flex items-center gap-4">
+        <div class="text-[14px] text-gray-700">
+          <span class="text-[13px] text-[#4B5563] mr-1.5">Time</span>
+          <span id="sim-clock" class="font-tabular font-semibold text-gray-900 text-base">T+00s</span>
         </div>
-        <p class="text-xs text-slate-400 font-sans">Automated Acoustic Localizer & Rapid Solenoid Isolation Engine</p>
-      </div>
-    </div>
-
-    <!-- Live Simulation Time & Status Badges -->
-    <div class="flex flex-wrap items-center gap-3">
-      <div class="bg-slate-950 border border-slate-800 px-3.5 py-1.5 rounded-lg flex items-center gap-2.5">
-        <i data-lucide="clock" class="w-4 h-4 text-cyan-400"></i>
-        <span class="text-xs text-slate-400 tracking-wider">TIME:</span>
-        <span id="sim-clock" class="text-lg font-bold text-cyan-400 tracking-widest">T+00s</span>
-      </div>
-
-      <!-- System Status Badge -->
-      <div id="sys-status-badge" class="px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border bg-emerald-950/60 border-emerald-500/50 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-        <span id="sys-status-text">NORMAL</span>
-      </div>
-
-      <!-- Valve Status Badge -->
-      <div id="valve-status-badge" class="px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border bg-emerald-950/60 border-emerald-500/50 text-emerald-400">
-        <i id="valve-badge-icon" data-lucide="unlock" class="w-4 h-4"></i>
-        <span id="valve-status-text">VALVE OPEN</span>
-      </div>
-
-      <!-- WiFi / Link Badge -->
-      <div class="hidden md:flex items-center gap-1.5 text-xs text-emerald-400 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
-        <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
-        <span class="text-[11px] text-slate-300">LINK: 100%</span>
+        <div id="sys-status-badge" class="px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 border bg-emerald-50 border-emerald-200 text-emerald-800">
+          <span id="sys-status-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+          <span id="sys-status-text">NORMAL</span>
+        </div>
       </div>
     </div>
   </header>
 
-  <!-- SAFETY SEQUENCE BANNER -->
-  <section id="safety-sequence-banner" class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-    <div class="flex items-center gap-2 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-      <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
-      <span>Safety Response Protocol:</span>
-    </div>
-    <div id="seq-steps" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[11px]">
-      <span data-seq="monitor" class="px-2.5 py-1 rounded border transition-all duration-300 bg-cyan-950/80 border-cyan-400 text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.3)]">1. Monitor</span>
-      <span class="text-slate-600">→</span>
-      <span data-seq="detect" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">2. Detect</span>
-      <span class="text-slate-600">→</span>
-      <span data-seq="verify" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">3. Verify</span>
-      <span class="text-slate-600">→</span>
-      <span data-seq="localize" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">4. Localize (Zone C)</span>
-      <span class="text-slate-600">→</span>
-      <span data-seq="isolate" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">5. Isolate</span>
-      <span class="text-slate-600">→</span>
-      <span data-seq="confirm" class="px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-500">6. Confirm</span>
-    </div>
-  </section>
+  <!-- MAIN WRAPPER (1200px, 24px gap) -->
+  <main class="max-w-[1200px] mx-auto px-6 pt-6 flex flex-col gap-6">
 
-  <!-- PLAYBACK CONTROL BAR -->
-  <section id="playback-controls" class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
-    <div class="flex items-center gap-2">
-      <button id="btn-play-pause" class="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition shadow-[0_0_15px_rgba(6,182,212,0.4)]">
-        <i id="play-pause-icon" data-lucide="play" class="w-4 h-4"></i>
-        <span id="play-pause-label">PLAY</span>
-      </button>
-      <button id="btn-reset" class="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition">
-        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-        <span>RESET</span>
-      </button>
-    </div>
+    <!-- 1. PROTOCOL STEPPER -->
+    <section class="h2-card p-6">
+      <div class="flex items-center justify-between relative">
+        <!-- Connecting Line behind circles -->
+        <div class="absolute left-6 right-6 top-4 h-[2px] bg-gray-200 -z-0"></div>
 
-    <!-- Scrubber Slider -->
-    <div class="flex-1 min-w-[240px] flex items-center gap-3">
-      <span class="text-xs text-slate-400 font-mono">0s</span>
-      <input id="scrubber-slider" type="range" min="0" max="180" value="0" step="1"
-        class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400" />
-      <span class="text-xs text-slate-400 font-mono">180s</span>
-    </div>
-
-    <!-- Speed Toggles -->
-    <div class="flex items-center gap-1.5 bg-slate-950 p-1 border border-slate-800 rounded-lg">
-      <span class="text-[10px] text-slate-400 px-2 uppercase font-semibold">Speed:</span>
-      <button data-speed="1" class="speed-btn px-2.5 py-1 text-xs font-bold rounded bg-cyan-600 text-white">1x</button>
-      <button data-speed="2" class="speed-btn px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white">2x</button>
-      <button data-speed="5" class="speed-btn px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white">5x</button>
-    </div>
-  </section>
-
-  <!-- MAIN TELEMETRY GRID -->
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-
-    <!-- LEFT COLUMN: Physical Tank Schematic + Gauges (7 cols) -->
-    <div class="lg:col-span-7 flex flex-col gap-4">
-
-      <!-- PHYSICAL TANK SCHEMATIC -->
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col gap-3">
-        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
-          <div class="flex items-center gap-2">
-            <i data-lucide="cylinder" class="w-4 h-4 text-cyan-400"></i>
-            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-200">Composite Tank Vessel — Acoustic Localization Schematic</h2>
+        <!-- 6 Steps -->
+        <div class="relative z-10 flex flex-col items-center flex-1" id="step-node-monitor">
+          <div id="step-circ-monitor" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-[#005C4B] text-white">
+            <i data-lucide="check" class="w-4 h-4"></i>
           </div>
-          <span id="valve-state-tag" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-700">SOLENOID ENERGIZED (OPEN)</span>
+          <span id="step-lbl-monitor" class="text-xs font-medium text-gray-900 mt-2 text-center">Monitor</span>
         </div>
 
-        <!-- SVG Tank Graphic -->
-        <div class="relative w-full aspect-[21/9] flex items-center justify-center bg-slate-950/60 rounded-lg border border-slate-800/60 p-2 overflow-hidden">
-          <svg viewBox="0 0 800 320" class="w-full h-full select-none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="tankBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#1e293b" />
-                <stop offset="50%" stop-color="#0f172a" />
-                <stop offset="100%" stop-color="#090d16" />
-              </linearGradient>
-              <linearGradient id="pipeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#64748b" />
-                <stop offset="50%" stop-color="#334155" />
-                <stop offset="100%" stop-color="#1e293b" />
-              </linearGradient>
-              <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="6" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
+        <div class="relative z-10 flex flex-col items-center flex-1" id="step-node-detect">
+          <div id="step-circ-detect" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-white border border-gray-300 text-gray-500">
+            2
+          </div>
+          <span id="step-lbl-detect" class="text-xs font-medium text-gray-500 mt-2 text-center">Detect</span>
+        </div>
 
-            <!-- Annular Shell Background (Pressure Boundary) -->
-            <rect x="150" y="40" width="460" height="230" rx="90" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="6 4" opacity="0.6"/>
-            <text x="380" y="32" fill="#64748b" font-size="10" text-anchor="middle" letter-spacing="2">VACUUM / ANNULAR MONITORING SPACE</text>
+        <div class="relative z-10 flex flex-col items-center flex-1" id="step-node-verify">
+          <div id="step-circ-verify" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-white border border-gray-300 text-gray-500">
+            3
+          </div>
+          <span id="step-lbl-verify" class="text-xs font-medium text-gray-500 mt-2 text-center">Verify</span>
+        </div>
 
-            <!-- Inlet / Outlet Lines -->
-            <path d="M 60 155 L 170 155" stroke="url(#pipeGrad)" stroke-width="14" stroke-linecap="round"/>
-            <path d="M 590 155 L 740 155" stroke="url(#pipeGrad)" stroke-width="14" stroke-linecap="round"/>
+        <div class="relative z-10 flex flex-col items-center flex-1" id="step-node-localize">
+          <div id="step-circ-localize" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-white border border-gray-300 text-gray-500">
+            4
+          </div>
+          <span id="step-lbl-localize" class="text-xs font-medium text-gray-500 mt-2 text-center">Localize</span>
+        </div>
 
-            <!-- Automated Isolation Solenoid Valve on Outlet Line (x: 640, y: 155) -->
-            <g id="valve-graphic" transform="translate(640, 155)">
-              <rect x="-24" y="-28" width="48" height="56" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
-              <!-- Valve Flanges -->
-              <polygon points="-16,-18 0,0 -16,18" fill="#38bdf8" id="valve-gate-left"/>
-              <polygon points="16,-18 0,0 16,18" fill="#38bdf8" id="valve-gate-right"/>
-              <circle cx="0" cy="0" r="5" fill="#f8fafc" id="valve-pin"/>
-              <circle cx="0" cy="-36" r="8" fill="#10b981" id="valve-indicator-light"/>
-              <text x="0" y="42" fill="#94a3b8" font-size="9" font-family="monospace" text-anchor="middle" id="valve-subtext">SV-101 OPEN</text>
-            </g>
+        <div class="relative z-10 flex flex-col items-center flex-1" id="step-node-isolate">
+          <div id="step-circ-isolate" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-white border border-gray-300 text-gray-500">
+            5
+          </div>
+          <span id="step-lbl-isolate" class="text-xs font-medium text-gray-500 mt-2 text-center">Isolate</span>
+        </div>
 
-            <!-- Inlet Flow Arrow -->
-            <path d="M 80 155 L 110 155" stroke="#38bdf8" stroke-width="3" stroke-dasharray="8 6" opacity="0.8"/>
+        <div class="relative z-10 flex flex-col items-center flex-1" id="step-node-confirm">
+          <div id="step-circ-confirm" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-white border border-gray-300 text-gray-500">
+            6
+          </div>
+          <span id="step-lbl-confirm" class="text-xs font-medium text-gray-500 mt-2 text-center">Confirm</span>
+        </div>
+      </div>
+    </section>
 
-            <!-- Main Cylindrical Composite Tank Shell (x: 170, y: 55, w: 420, h: 200) -->
-            <!-- Left Dome -->
-            <path d="M 230 55 C 160 55, 160 255, 230 255 Z" fill="url(#tankBodyGrad)" stroke="#475569" stroke-width="2"/>
-            <!-- Right Dome -->
-            <path d="M 530 55 C 600 55, 600 255, 530 255 Z" fill="url(#tankBodyGrad)" stroke="#475569" stroke-width="2"/>
-            <!-- Center Cylinder -->
-            <rect x="230" y="55" width="300" height="200" fill="url(#tankBodyGrad)" stroke="#475569" stroke-width="2"/>
+    <!-- 2. PLAYBACK BAR -->
+    <section class="h2-card p-4 px-6 flex flex-wrap items-center justify-between gap-4">
+      <!-- Play and Reset on left -->
+      <div class="flex items-center gap-3">
+        <button id="btn-play-pause" class="flex items-center gap-2 px-4 py-2 bg-[#005C4B] hover:bg-[#0F4C42] text-white rounded text-[13px] font-semibold transition cursor-pointer">
+          <i id="play-pause-icon" data-lucide="play" class="w-3.5 h-3.5"></i>
+          <span id="play-pause-label">Play</span>
+        </button>
+        <button id="btn-reset" class="px-3 py-2 text-gray-600 hover:text-gray-900 text-[13px] font-medium transition cursor-pointer">
+          Reset
+        </button>
+      </div>
 
-            <!-- Divider Grid Lines for Quadrants A, B, C, D -->
-            <line x1="380" y1="55" x2="380" y2="255" stroke="#334155" stroke-width="1.5" stroke-dasharray="4 3"/>
-            <line x1="170" y1="155" x2="590" y2="155" stroke="#334155" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <!-- Scrubber in the middle with current time readout -->
+      <div class="flex-1 min-w-[280px] flex items-center gap-4">
+        <input id="scrubber-slider" type="range" min="0" max="180" value="0" step="1"
+          class="h2-scrubber w-full cursor-pointer" />
+        <span id="time-readout" class="font-tabular text-[13px] text-gray-600 font-medium whitespace-nowrap min-w-[75px] text-right">0 s / 180 s</span>
+      </div>
 
-            <!-- ZONE A (Top Left Quadrant) -->
-            <path id="zone-A" d="M 230 57 C 180 57, 180 153, 230 153 L 378 153 L 378 57 Z"
-              fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1.5" class="transition-all duration-300"/>
-            <circle cx="280" cy="105" r="4" fill="#34d399"/>
-            <text x="280" y="93" fill="#6ee7b7" font-size="11" font-weight="bold" text-anchor="middle">ZONE A</text>
-            <text id="txt-zone-A" x="280" y="125" fill="#a7f3d0" font-size="9" text-anchor="middle">5.1 dB</text>
+      <!-- Rate segmented control on right -->
+      <div class="flex items-center bg-gray-100 p-0.5 rounded border border-gray-200">
+        <button data-speed="1" class="speed-btn px-2.5 py-1 text-xs font-tabular rounded bg-white text-gray-900 border border-gray-300 font-semibold cursor-pointer">1x</button>
+        <button data-speed="2" class="speed-btn px-2.5 py-1 text-xs font-tabular rounded text-gray-600 hover:text-gray-900 border border-transparent font-medium cursor-pointer">2x</button>
+        <button data-speed="5" class="speed-btn px-2.5 py-1 text-xs font-tabular rounded text-gray-600 hover:text-gray-900 border border-transparent font-medium cursor-pointer">5x</button>
+      </div>
+    </section>
 
-            <!-- ZONE B (Top Right Quadrant) -->
-            <path id="zone-B" d="M 382 57 L 530 57 C 580 57, 580 153, 530 153 L 382 153 Z"
-              fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1.5" class="transition-all duration-300"/>
-            <circle cx="480" cy="105" r="4" fill="#34d399"/>
-            <text x="480" y="93" fill="#6ee7b7" font-size="11" font-weight="bold" text-anchor="middle">ZONE B</text>
-            <text id="txt-zone-B" x="480" y="125" fill="#a7f3d0" font-size="9" text-anchor="middle">5.3 dB</text>
-
-            <!-- ZONE C (Bottom Left Quadrant) - CRITICAL ANOMALY LOCATION -->
-            <path id="zone-C" d="M 230 157 C 180 157, 180 253, 230 253 L 378 253 L 378 157 Z"
-              fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1.5" class="transition-all duration-300"/>
-            <circle cx="280" cy="205" r="4" fill="#34d399" id="sensor-c-dot"/>
-            <text x="280" y="193" fill="#6ee7b7" font-size="11" font-weight="bold" text-anchor="middle" id="lbl-zone-C">ZONE C</text>
-            <text id="txt-zone-C" x="280" y="225" fill="#a7f3d0" font-size="9" text-anchor="middle">5.3 dB</text>
-
-            <!-- ZONE D (Bottom Right Quadrant) -->
-            <path id="zone-D" d="M 382 157 L 530 157 C 580 157, 580 253, 530 253 L 382 253 Z"
-              fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1.5" class="transition-all duration-300"/>
-            <circle cx="480" cy="205" r="4" fill="#34d399"/>
-            <text x="480" y="193" fill="#6ee7b7" font-size="11" font-weight="bold" text-anchor="middle">ZONE D</text>
-            <text id="txt-zone-D" x="480" y="225" fill="#a7f3d0" font-size="9" text-anchor="middle">5.6 dB</text>
-          </svg>
+    <!-- 3. KPI ROW (4 Equal White Cards) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <!-- 1: Tank Pressure -->
+      <div id="kpi-card-press" class="h2-card p-6 flex flex-col justify-between">
+        <span class="text-[13px] text-[#4B5563]">Tank pressure</span>
+        <div class="mt-2 flex items-baseline gap-1.5">
+          <span id="val-press" class="text-[32px] font-semibold font-tabular text-gray-900 leading-none">1.022</span>
+          <span class="text-[12px] text-[#4B5563]">bar</span>
         </div>
       </div>
 
-      <!-- CORE GAUGES ROW (5 Telemetry metrics) -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
-        <!-- Temp -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-slate-400 text-[11px]">
-            <span>Temperature</span>
-            <i data-lucide="thermometer" class="w-3.5 h-3.5 text-amber-400"></i>
-          </div>
-          <div class="my-1.5 flex items-baseline gap-1">
-            <span id="val-temp" class="text-xl font-bold text-slate-100">24.89</span>
-            <span class="text-xs text-slate-400">°C</span>
-          </div>
-          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-            <div id="bar-temp" class="bg-amber-400 h-full w-[35%] transition-all duration-200"></div>
-          </div>
+      <!-- 2: Annular Pressure -->
+      <div id="kpi-card-annular" class="h2-card p-6 flex flex-col justify-between">
+        <span class="text-[13px] text-[#4B5563]">Annular pressure</span>
+        <div class="mt-2 flex items-baseline gap-1.5">
+          <span id="val-annular" class="text-[32px] font-semibold font-tabular text-gray-900 leading-none">1.014</span>
+          <span class="text-[12px] text-[#4B5563]">bar</span>
         </div>
+      </div>
 
-        <!-- Tank Pressure -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-slate-400 text-[11px]">
-            <span>Tank Press</span>
-            <i data-lucide="gauge" class="w-3.5 h-3.5 text-cyan-400"></i>
-          </div>
-          <div class="my-1.5 flex items-baseline gap-1">
-            <span id="val-press" class="text-xl font-bold text-cyan-400">1.022</span>
-            <span class="text-xs text-slate-400">bar</span>
-          </div>
-          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-            <div id="bar-press" class="bg-cyan-400 h-full w-[50%] transition-all duration-200"></div>
-          </div>
+      <!-- 3: Leak Rate -->
+      <div id="kpi-card-leak" class="h2-card p-6 flex flex-col justify-between">
+        <span class="text-[13px] text-[#4B5563]">Leak rate</span>
+        <div class="mt-2 flex items-baseline gap-1.5">
+          <span id="val-leak" class="text-[32px] font-semibold font-tabular text-gray-900 leading-none">0.0</span>
+          <span class="text-[12px] text-[#4B5563]">ppm</span>
         </div>
+      </div>
 
-        <!-- Annular Pressure -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-slate-400 text-[11px]">
-            <span>Annular Press</span>
-            <i data-lucide="shield" class="w-3.5 h-3.5 text-indigo-400"></i>
-          </div>
-          <div class="my-1.5 flex items-baseline gap-1">
-            <span id="val-annular" class="text-xl font-bold text-indigo-400">1.014</span>
-            <span class="text-xs text-slate-400">bar</span>
-          </div>
-          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-            <div id="bar-annular" class="bg-indigo-400 h-full w-[50%] transition-all duration-200"></div>
-          </div>
+      <!-- 4: Strain -->
+      <div id="kpi-card-strain" class="h2-card p-6 flex flex-col justify-between">
+        <span class="text-[13px] text-[#4B5563]">Strain</span>
+        <div class="mt-2 flex items-baseline gap-1.5">
+          <span id="val-strain" class="text-[32px] font-semibold font-tabular text-gray-900 leading-none">99.2</span>
+          <span class="text-[12px] text-[#4B5563]">µε</span>
         </div>
+      </div>
+    </section>
 
-        <!-- Structural Strain -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-slate-400 text-[11px]">
-            <span>Strain</span>
-            <i data-lucide="zap" class="w-3.5 h-3.5 text-orange-400"></i>
-          </div>
-          <div class="my-1.5 flex items-baseline gap-1">
-            <span id="val-strain" class="text-xl font-bold text-orange-400">99.2</span>
-            <span class="text-xs text-slate-400">µε</span>
-          </div>
-          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-            <div id="bar-strain" class="bg-orange-400 h-full w-[40%] transition-all duration-200"></div>
-          </div>
-        </div>
+    <!-- 4. SCHEMATIC + CHARTS (2 Columns) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        <!-- H2 Leak PPM -->
-        <div id="card-leak" class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between transition-colors duration-300">
-          <div class="flex items-center justify-between text-slate-400 text-[11px]">
-            <span>H2 Leak</span>
-            <i data-lucide="wind" class="w-3.5 h-3.5 text-rose-400"></i>
+      <!-- LEFT COLUMN: Physical Schematic (7 cols) -->
+      <div class="lg:col-span-7 flex flex-col">
+        <div class="h2-card px-6 py-4 flex flex-col justify-between h-full">
+          <div>
+            <h2 class="text-base font-semibold text-[#005C4B]">Vessel cross-section and acoustic emission</h2>
+            <p class="text-[13px] text-[#4B5563] mt-0.5">Type-IV composite pressure vessel with four monitored zones</p>
           </div>
-          <div class="my-1.5 flex items-baseline gap-1">
-            <span id="val-leak" class="text-xl font-bold text-rose-400">0.0</span>
-            <span class="text-xs text-slate-400">ppm</span>
+
+          <!-- Redrawn SVG Tank Schematic (viewBox 0 0 900 340, ~85% width) -->
+          <div class="my-2 w-full flex items-center justify-center select-none">
+            <svg viewBox="0 0 900 340" class="w-full h-auto select-none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <!-- SVG ClipPath for Exact Type-IV Vessel Interior Profile -->
+                <!-- Cylindrical body: x 170 to 710 (width 540), y 80 to 260 (height 180) -->
+                <!-- Left elliptical dome: cx 170, cy 170, rx 90, ry 90 (leftmost: 80) -->
+                <!-- Right elliptical dome: cx 710, cy 170, rx 90, ry 90 (rightmost: 800) -->
+                <!-- Total vessel width: 720px (80% to 85% of 900px) -->
+                <clipPath id="tank-interior-clip">
+                  <path d="M 170 80 
+                           L 710 80 
+                           A 90 90 0 0 1 800 170 
+                           A 90 90 0 0 1 710 260 
+                           L 170 260 
+                           A 90 90 0 0 1 80 170 
+                           A 90 90 0 0 1 170 80 Z" />
+                </clipPath>
+              </defs>
+
+              <!-- Process Inlet Pipe (Left) -->
+              <line x1="10" y1="170" x2="65" y2="170" stroke="#9CA3AF" stroke-width="5" stroke-linecap="round"/>
+              <text x="35" y="158" fill="#6B7280" font-size="12" font-family="'Inter', sans-serif" text-anchor="middle">Inlet</text>
+
+              <!-- Left Metal Boss -->
+              <rect x="65" y="152" width="16" height="36" rx="2" fill="#9CA3AF" stroke="#6B7280" stroke-width="1.5"/>
+
+              <!-- Annular Space Band (Plain band hugging outer shell) -->
+              <!-- Offset by 12px -->
+              <path d="M 170 68 
+                       L 710 68 
+                       A 102 102 0 0 1 812 170 
+                       A 102 102 0 0 1 710 272 
+                       L 170 272 
+                       A 102 102 0 0 1 68 170 
+                       A 102 102 0 0 1 170 68 Z" 
+                    fill="none" stroke="#D1D5DB" stroke-width="1.5" stroke-dasharray="4 4"/>
+              
+              <!-- Annular space label positioned above Zone A/B seam so it never touches Zone C leader line -->
+              <text x="260" y="58" fill="#9CA3AF" font-size="12" font-family="'Inter', sans-serif" text-anchor="middle">
+                Annular space (PT-102)
+              </text>
+
+              <!-- Process Outlet Pipe with Solenoid Valve XV-201 (Right) -->
+              <line x1="815" y1="170" x2="895" y2="170" stroke="#9CA3AF" stroke-width="5" stroke-linecap="round"/>
+              <!-- Right Metal Boss -->
+              <rect x="799" y="152" width="16" height="36" rx="2" fill="#9CA3AF" stroke="#6B7280" stroke-width="1.5"/>
+
+              <!-- XV-201 Valve Symbol on Outlet Pipe (x: 855, y: 170) -->
+              <g id="valve-symbol-grp" transform="translate(855, 170)">
+                <!-- Actuator box -->
+                <rect x="-9" y="-26" width="18" height="13" rx="2" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.5" id="v-act-box"/>
+                <text x="0" y="-17" fill="#374151" font-size="10" font-weight="600" text-anchor="middle">S</text>
+                <line x1="0" y1="-13" x2="0" y2="-4" stroke="#6B7280" stroke-width="1.5"/>
+                <!-- Valve Gate Triangles -->
+                <polygon points="-11,-9 0,0 -11,9" fill="#E5E7EB" stroke="#4B5563" stroke-width="1.5" id="v-gate-left"/>
+                <polygon points="11,-9 0,0 11,9" fill="#E5E7EB" stroke="#4B5563" stroke-width="1.5" id="v-gate-right"/>
+                <circle cx="0" cy="0" r="2.5" fill="#1F2937"/>
+              </g>
+
+              <!-- Gas Detector AT-101 Symbol -->
+              <g transform="translate(855, 218)">
+                <circle cx="0" cy="0" r="11" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.5"/>
+                <text x="0" y="4" fill="#374151" font-size="11" font-weight="600" text-anchor="middle">AT</text>
+                <line x1="0" y1="-11" x2="0" y2="-36" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="2 2"/>
+              </g>
+
+              <!-- Vessel Zone Fills Clipped to Vessel Outline -->
+              <g clip-path="url(#tank-interior-clip)">
+                <!-- Zone A: x 70 to 260 -->
+                <rect id="zone-fill-A" x="70" y="70" width="190" height="200" fill="#F3F4F6"/>
+                <!-- Zone B: x 260 to 440 -->
+                <rect id="zone-fill-B" x="260" y="70" width="180" height="200" fill="#F3F4F6"/>
+                <!-- Zone C: x 440 to 620 (Anomaly Zone) -->
+                <rect id="zone-fill-C" x="440" y="70" width="180" height="200" fill="#F3F4F6"/>
+                <!-- Zone D: x 620 to 810 -->
+                <rect id="zone-fill-D" x="620" y="70" width="190" height="200" fill="#F3F4F6"/>
+
+                <!-- Thin Hoop Lines dividing the 4 zones -->
+                <line x1="260" y1="70" x2="260" y2="270" stroke="#D1D5DB" stroke-width="1.5"/>
+                <line x1="440" y1="70" x2="440" y2="270" stroke="#D1D5DB" stroke-width="1.5"/>
+                <line x1="620" y1="70" x2="620" y2="270" stroke="#D1D5DB" stroke-width="1.5"/>
+
+                <!-- Thin Inner Liner Outline -->
+                <path d="M 170 86 
+                         L 710 86 
+                         A 84 84 0 0 1 794 170 
+                         A 84 84 0 0 1 710 254 
+                         L 170 254 
+                         A 84 84 0 0 1 86 170 
+                         A 84 84 0 0 1 170 86 Z" 
+                      fill="none" stroke="#E5E7EB" stroke-width="1.5"/>
+              </g>
+
+              <!-- Outer Composite Shell Outline (solid #6B7280 stroke 2.5px) -->
+              <path d="M 170 80 
+                       L 710 80 
+                       A 90 90 0 0 1 800 170 
+                       A 90 90 0 0 1 710 260 
+                       L 170 260 
+                       A 90 90 0 0 1 80 170 
+                       A 90 90 0 0 1 170 80 Z" 
+                    fill="none" stroke="#6B7280" stroke-width="2.5"/>
+
+              <!-- ZONE LABELS ABOVE VESSEL ON LEADER LINES (14px) -->
+              <!-- Zone A (center x: 170) -->
+              <g transform="translate(170, 42)">
+                <text x="0" y="0" fill="#4B5563" font-size="14" font-weight="600" text-anchor="middle">Zone A</text>
+                <line x1="0" y1="6" x2="0" y2="36" stroke="#9CA3AF" stroke-width="1"/>
+              </g>
+
+              <!-- Zone B (center x: 350) -->
+              <g transform="translate(350, 42)">
+                <text x="0" y="0" fill="#4B5563" font-size="14" font-weight="600" text-anchor="middle">Zone B</text>
+                <line x1="0" y1="6" x2="0" y2="36" stroke="#9CA3AF" stroke-width="1"/>
+              </g>
+
+              <!-- Zone C (center x: 530) -->
+              <g transform="translate(530, 42)">
+                <text id="lbl-zone-C" x="0" y="0" fill="#4B5563" font-size="14" font-weight="600" text-anchor="middle">Zone C</text>
+                <line id="line-zone-C" x1="0" y1="6" x2="0" y2="36" stroke="#9CA3AF" stroke-width="1"/>
+              </g>
+
+              <!-- Zone D (center x: 710) -->
+              <g transform="translate(710, 42)">
+                <text x="0" y="0" fill="#4B5563" font-size="14" font-weight="600" text-anchor="middle">Zone D</text>
+                <line x1="0" y1="6" x2="0" y2="36" stroke="#9CA3AF" stroke-width="1"/>
+              </g>
+
+              <!-- ZONE dB VALUES BELOW VESSEL (18px semibold tabular) -->
+              <!-- Zone A dB -->
+              <text id="txt-zone-A" x="170" y="302" fill="#1F2937" font-size="18" font-weight="600" font-family="'Inter', sans-serif" font-variant-numeric="tabular-nums" text-anchor="middle">
+                5.1 dB
+              </text>
+              <!-- Zone B dB -->
+              <text id="txt-zone-B" x="350" y="302" fill="#1F2937" font-size="18" font-weight="600" font-family="'Inter', sans-serif" font-variant-numeric="tabular-nums" text-anchor="middle">
+                5.3 dB
+              </text>
+              <!-- Zone C dB -->
+              <text id="txt-zone-C" x="530" y="302" fill="#1F2937" font-size="18" font-weight="600" font-family="'Inter', sans-serif" font-variant-numeric="tabular-nums" text-anchor="middle">
+                5.3 dB
+              </text>
+              <!-- Zone D dB -->
+              <text id="txt-zone-D" x="710" y="302" fill="#1F2937" font-size="18" font-weight="600" font-family="'Inter', sans-serif" font-variant-numeric="tabular-nums" text-anchor="middle">
+                5.6 dB
+              </text>
+            </svg>
           </div>
-          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-            <div id="bar-leak" class="bg-rose-500 h-full w-[0%] transition-all duration-200"></div>
+
+          <!-- Legend Row Below Drawing: XV-201 and AT-101 status labels (12px) -->
+          <div class="flex items-center justify-between border-t border-gray-100 pt-2.5 text-[12px] text-[#4B5563]">
+            <div class="flex items-center gap-6">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-600" id="valve-legend-dot"></span>
+                <span class="font-medium text-gray-700">XV-201 isolation valve:</span>
+                <span id="valve-legend-status" class="font-semibold text-emerald-800">Open</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-gray-400" id="at-legend-dot"></span>
+                <span class="font-medium text-gray-700">AT-101 leak detector:</span>
+                <span id="at-legend-status" class="font-tabular text-gray-800">0.0 ppm</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Plain English Dynamic State Caption -->
+          <div class="bg-gray-50 rounded-lg p-3 mt-2.5 border border-gray-100">
+            <p id="schematic-caption" class="text-[13px] text-gray-700 leading-relaxed">
+              All four vessel zones operating normally within nominal acoustic and pressure thresholds.
+            </p>
           </div>
         </div>
       </div>
 
-      <!-- ACOUSTIC SPECTRUM ANALYSIS MINI-BAR CHART -->
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 shadow-xl">
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2">
-            <i data-lucide="bar-chart-2" class="w-4 h-4 text-cyan-400"></i>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Acoustic Emission Spectrum Comparison (Zone A–D)</h3>
-          </div>
-          <span class="text-[11px] text-slate-400">Threshold: &gt;8.0 dB (Warn) / &gt;12.0 dB (Crit)</span>
-        </div>
-        <div class="grid grid-cols-4 gap-3 pt-1">
-          <!-- Zone A bar -->
-          <div class="flex flex-col items-center gap-1.5">
-            <div class="h-20 w-full bg-slate-950 rounded-lg p-1 flex items-end">
-              <div id="bar-ac-A" class="w-full bg-emerald-500 rounded transition-all duration-200 h-[25%]"></div>
-            </div>
-            <span class="text-[11px] font-bold text-slate-300">Zone A</span>
-            <span id="val-ac-A" class="text-xs font-mono text-emerald-400">5.1 dB</span>
-          </div>
-          <!-- Zone B bar -->
-          <div class="flex flex-col items-center gap-1.5">
-            <div class="h-20 w-full bg-slate-950 rounded-lg p-1 flex items-end">
-              <div id="bar-ac-B" class="w-full bg-emerald-500 rounded transition-all duration-200 h-[26%]"></div>
-            </div>
-            <span class="text-[11px] font-bold text-slate-300">Zone B</span>
-            <span id="val-ac-B" class="text-xs font-mono text-emerald-400">5.3 dB</span>
-          </div>
-          <!-- Zone C bar (Spiking) -->
-          <div class="flex flex-col items-center gap-1.5">
-            <div class="h-20 w-full bg-slate-950 rounded-lg p-1 flex items-end">
-              <div id="bar-ac-C" class="w-full bg-emerald-500 rounded transition-all duration-200 h-[26%]"></div>
-            </div>
-            <span class="text-[11px] font-bold text-slate-300">Zone C</span>
-            <span id="val-ac-C" class="text-xs font-mono text-emerald-400 font-bold">5.3 dB</span>
-          </div>
-          <!-- Zone D bar -->
-          <div class="flex flex-col items-center gap-1.5">
-            <div class="h-20 w-full bg-slate-950 rounded-lg p-1 flex items-end">
-              <div id="bar-ac-D" class="w-full bg-emerald-500 rounded transition-all duration-200 h-[28%]"></div>
-            </div>
-            <span class="text-[11px] font-bold text-slate-300">Zone D</span>
-            <span id="val-ac-D" class="text-xs font-mono text-emerald-400">5.6 dB</span>
-          </div>
-        </div>
-      </div>
+      <!-- RIGHT COLUMN: Charts (5 cols) -->
+      <div class="lg:col-span-5 flex flex-col gap-6">
 
-    </div>
-
-    <!-- RIGHT COLUMN: Strip-Charts + Decision Matrix + Event Log (5 cols) -->
-    <div class="lg:col-span-5 flex flex-col gap-4">
-
-      <!-- HISTORICAL STRIP-CHARTS (Synchronized Chart.js) -->
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 shadow-xl flex flex-col gap-3">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div class="flex items-center gap-2">
-            <i data-lucide="trending-up" class="w-4 h-4 text-cyan-400"></i>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Real-Time Telemetry Strip-Charts</h3>
-          </div>
-          <span class="text-[10px] text-slate-400">Synchronized Time-Series</span>
-        </div>
-
-        <!-- Chart 1: Pressures -->
-        <div>
-          <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-            <span>Tank & Annular Pressure (bar)</span>
-            <div class="flex items-center gap-3 text-[10px]">
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span>Tank Press</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-400"></span>Annular Press</span>
+        <!-- Chart 1: Pressure Profiles -->
+        <div class="h2-card p-6 flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-semibold text-[#005C4B]">Pressure</h3>
+            <div class="flex items-center gap-4 text-xs text-[#4B5563]">
+              <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-[#005C4B]"></span>Tank (PT-101)</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-[#C8A165]"></span>Annular (PT-102)</span>
             </div>
           </div>
-          <div class="h-32 w-full bg-slate-950 rounded-lg p-1">
+          <div class="h-44 w-full">
             <canvas id="chart-pressure"></canvas>
           </div>
         </div>
 
-        <!-- Chart 2: Leak & Strain -->
-        <div>
-          <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-            <span>H2 Leak (ppm) & Strain (µε)</span>
-            <div class="flex items-center gap-3 text-[10px]">
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-400"></span>Leak (ppm)</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Strain (µε)</span>
+        <!-- Chart 2: Leak & Strain Profiles -->
+        <div class="h2-card p-6 flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-semibold text-[#005C4B]">Leak and strain</h3>
+            <div class="flex items-center gap-4 text-xs text-[#4B5563]">
+              <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-[#B91C1C]"></span>Leak (ppm)</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-[#C8A165] border-b border-dashed border-[#C8A165]"></span>Strain (µε)</span>
             </div>
           </div>
-          <div class="h-32 w-full bg-slate-950 rounded-lg p-1">
+          <div class="h-44 w-full">
             <canvas id="chart-leak-strain"></canvas>
           </div>
         </div>
+
       </div>
-
-      <!-- SENSOR FUSION DECISION MATRIX -->
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 shadow-xl">
-        <div class="flex items-center gap-2 border-b border-slate-800 pb-2 mb-2.5">
-          <i data-lucide="git-branch" class="w-4 h-4 text-cyan-400"></i>
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Sensor Fusion Decision Matrix</h3>
-        </div>
-        <div class="space-y-2 text-xs">
-          <!-- Gate 1 -->
-          <div id="gate-1" class="p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all">
-            <span id="gate-1-chk" class="text-slate-600 font-bold">[  ]</span>
-            <div class="flex-1">
-              <div class="flex items-center justify-between font-bold">
-                <span id="gate-1-title" class="text-slate-400">Single Anomaly Detection</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">→ WARNING</span>
-              </div>
-              <p class="text-[11px] text-slate-500 mt-0.5">Zone C Acoustic Emission &gt; 8.0 dB without initial pressure loss.</p>
-            </div>
-          </div>
-
-          <!-- Gate 2 -->
-          <div id="gate-2" class="p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all">
-            <span id="gate-2-chk" class="text-slate-600 font-bold">[  ]</span>
-            <div class="flex-1">
-              <div class="flex items-center justify-between font-bold">
-                <span id="gate-2-title" class="text-slate-400">Multi-Sensor Correlation</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">→ CRITICAL</span>
-              </div>
-              <p class="text-[11px] text-slate-500 mt-0.5">Concurrent Acoustic spike + H2 Leak detected (&gt;20 ppm) + Structural Strain spike (&gt;125 µε).</p>
-            </div>
-          </div>
-
-          <!-- Gate 3 -->
-          <div id="gate-3" class="p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all">
-            <span id="gate-3-chk" class="text-slate-600 font-bold">[  ]</span>
-            <div class="flex-1">
-              <div class="flex items-center justify-between font-bold">
-                <span id="gate-3-title" class="text-slate-400">Automatic Solenoid Trip Signal</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">→ ISOLATED</span>
-              </div>
-              <p class="text-[11px] text-slate-500 mt-0.5">Rapid safety shutoff valve actuation to seal tank boundary and isolate downstream line.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- TERMINAL-STYLE LIVE EVENT LOG -->
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 shadow-xl flex flex-col flex-1">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-          <div class="flex items-center gap-2">
-            <i data-lucide="terminal" class="w-4 h-4 text-cyan-400"></i>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Terminal Live Event Log</h3>
-          </div>
-          <span class="text-[10px] text-emerald-400 flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LOGGING ACTIVE
-          </span>
-        </div>
-        <div id="event-log-container" class="h-44 overflow-y-auto custom-scroll bg-slate-950 rounded-lg p-2.5 text-[11px] font-mono space-y-1.5 text-slate-400 border border-slate-900">
-          <div class="text-slate-500">[00:00:00] SYSTEM INITIALIZED. Telemetry polling at 1Hz...</div>
-          <div class="text-emerald-400">[00:00:00] [NORMAL] Composite vessel baseline nominal. All valves open.</div>
-        </div>
-      </div>
-
     </div>
-  </div>
+
+    <!-- 5. EVENT LOG (Plain Table with 420px max height and toggle) -->
+    <section class="h2-card p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-base font-semibold text-[#005C4B]">Event log</h3>
+          <p class="text-[12px] text-[#4B5563] mt-0.5">Automated safety instrumented audit log</p>
+        </div>
+        <!-- Show all events text toggle -->
+        <button id="btn-toggle-events" class="text-[12px] font-medium text-[#005C4B] hover:text-[#0F4C42] underline cursor-pointer">
+          Show all events
+        </button>
+      </div>
+
+      <div class="overflow-y-auto max-h-[420px] custom-scroll border border-gray-100 rounded-lg">
+        <table class="w-full text-left text-sm border-collapse">
+          <thead class="sticky top-0 bg-white z-10">
+            <tr class="border-b border-gray-200 text-[12px] font-semibold text-[#4B5563] bg-gray-50">
+              <th class="py-2.5 px-3">Time</th>
+              <th class="py-2.5 px-3">Event</th>
+              <th class="py-2.5 px-3">Zone</th>
+              <th class="py-2.5 px-3">Status</th>
+            </tr>
+          </thead>
+          <tbody id="event-log-container" class="divide-y divide-gray-100 text-gray-800">
+            <!-- Dynamically populated table rows -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- SMALL GRAY FOOTER LINE -->
+  <footer class="max-w-[1200px] mx-auto px-6 mt-8 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3 text-[13px] text-[#4B5563]">
+    <div class="flex items-center gap-4">
+      <span id="footer-valve-status">XV-201: Open</span>
+      <span>·</span>
+      <span>Modbus/TCP 1Hz</span>
+      <span>·</span>
+      <span>IEC 61508 SIL-2</span>
+    </div>
+    <span>H2-Shield™ safety system · Laboratory of clean hydrogen energy</span>
+  </footer>
 
   <script>
     // RAW CSV EMBEDDED DATA (T=0s to T=180s)
@@ -684,36 +702,72 @@
       return data;
     }
 
-    // Initialize Chart.js
+    // Helper: 5-point moving average for DISPLAY only (smoothes visual scribble without altering data)
+    function movingAverage5(arr) {
+      const result = [];
+      for (let i = 0; i < arr.length; i++) {
+        let sum = 0;
+        let count = 0;
+        const start = Math.max(0, i - 4);
+        for (let j = start; j <= i; j++) {
+          sum += arr[j];
+          count++;
+        }
+        result.push(sum / count);
+      }
+      return result;
+    }
+
+    // Helper: 3-point moving average for strain/leak display
+    function movingAverage3(arr) {
+      const result = [];
+      for (let i = 0; i < arr.length; i++) {
+        if (i === 0) {
+          result.push(arr[0]);
+        } else if (i === 1) {
+          result.push((arr[0] + arr[1]) / 2);
+        } else {
+          result.push((arr[i - 2] + arr[i - 1] + arr[i]) / 3);
+        }
+      }
+      return result;
+    }
+
+    // Initialize Chart.js with matching layout padding and fixed y-axis widths for perfect x-axis alignment
     function initCharts() {
       const chartDefaults = {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 0 },
         interaction: { mode: 'index', intersect: false },
+        layout: {
+          padding: { left: 4, right: 8, top: 4, bottom: 0 }
+        },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#0f172a',
-            borderColor: '#334155',
+            backgroundColor: '#FFFFFF',
+            borderColor: '#E5E7EB',
             borderWidth: 1,
-            titleColor: '#94a3b8',
-            bodyFont: { family: 'monospace' }
+            titleColor: '#1F2937',
+            bodyColor: '#4B5563',
+            titleFont: { size: 12, family: "'Inter', sans-serif", weight: '600' },
+            bodyFont: { size: 12, family: "'Inter', sans-serif" },
+            padding: 8,
+            boxPadding: 4,
+            usePointStyle: true
           }
         },
         scales: {
           x: {
-            grid: { color: '#1e293b' },
-            ticks: { color: '#64748b', font: { size: 9, family: 'monospace' }, maxTicksLimit: 8 }
-          },
-          y: {
-            grid: { color: '#1e293b' },
-            ticks: { color: '#64748b', font: { size: 9, family: 'monospace' } }
+            grid: { color: '#E5E7EB', lineWidth: 1, drawBorder: false },
+            border: { display: false },
+            ticks: { color: '#6B7280', font: { size: 12, family: "'Inter', sans-serif" }, maxTicksLimit: 7 }
           }
         }
       };
 
-      // Chart 1: Pressures
+      // Chart 1: PT-101 & PT-102 Pressure Profiles (1.5px line width, fixed y-axis width)
       const ctxPress = document.getElementById('chart-pressure').getContext('2d');
       chartPressure = new Chart(ctxPress, {
         type: 'line',
@@ -721,39 +775,44 @@
           labels: [],
           datasets: [
             {
-              label: 'Tank Press (bar)',
+              label: 'Tank (PT-101)',
               data: [],
-              borderColor: '#22d3ee',
-              backgroundColor: 'rgba(34, 211, 238, 0.1)',
+              borderColor: '#005C4B',
+              backgroundColor: 'transparent',
               borderWidth: 1.5,
               pointRadius: 0,
-              tension: 0.1
+              tension: 0.2
             },
             {
-              label: 'Annular Press (bar)',
+              label: 'Annular (PT-102)',
               data: [],
-              borderColor: '#818cf8',
-              backgroundColor: 'rgba(129, 140, 248, 0.1)',
+              borderColor: '#C8A165',
+              backgroundColor: 'transparent',
               borderWidth: 1.5,
               pointRadius: 0,
-              tension: 0.1
+              tension: 0.2
             }
           ]
         },
         options: {
           ...chartDefaults,
           scales: {
-            ...chartDefaults.scales,
+            x: chartDefaults.scales.x,
             y: {
-              ...chartDefaults.scales.y,
-              suggestedMin: 0.88,
+              type: 'linear',
+              position: 'left',
+              afterFit: (axis) => { axis.width = 44; },
+              grid: { color: '#E5E7EB', lineWidth: 1, drawBorder: false },
+              border: { display: false },
+              ticks: { color: '#6B7280', font: { size: 12, family: "'Inter', sans-serif" } },
+              suggestedMin: 0.90,
               suggestedMax: 1.15
             }
           }
         }
       });
 
-      // Chart 2: Leak & Strain
+      // Chart 2: AT-101 Leak & ST-101 Strain Profiles (matching fixed y-axis width)
       const ctxLeakStrain = document.getElementById('chart-leak-strain').getContext('2d');
       chartLeakStrain = new Chart(ctxLeakStrain, {
         type: 'line',
@@ -761,24 +820,25 @@
           labels: [],
           datasets: [
             {
-              label: 'H2 Leak (ppm)',
+              label: 'Leak (AT-101)',
               data: [],
-              borderColor: '#f43f5e',
-              backgroundColor: 'rgba(244, 63, 94, 0.1)',
-              borderWidth: 2,
+              borderColor: '#B91C1C',
+              backgroundColor: 'transparent',
+              borderWidth: 1.5,
               pointRadius: 0,
               yAxisID: 'yLeak',
               tension: 0.2
             },
             {
-              label: 'Strain (µε)',
+              label: 'Strain (ST-101)',
               data: [],
-              borderColor: '#fbbf24',
-              backgroundColor: 'rgba(251, 191, 36, 0.05)',
+              borderColor: '#C8A165',
+              backgroundColor: 'transparent',
               borderWidth: 1.5,
+              borderDash: [4, 4],
               pointRadius: 0,
               yAxisID: 'yStrain',
-              tension: 0.1
+              tension: 0.2
             }
           ]
         },
@@ -789,16 +849,20 @@
             yLeak: {
               type: 'linear',
               position: 'left',
-              grid: { color: '#1e293b' },
-              ticks: { color: '#f43f5e', font: { size: 9, family: 'monospace' } },
+              afterFit: (axis) => { axis.width = 44; },
+              grid: { color: '#E5E7EB', lineWidth: 1, drawBorder: false },
+              border: { display: false },
+              ticks: { color: '#B91C1C', font: { size: 12, family: "'Inter', sans-serif" } },
               suggestedMin: 0,
-              suggestedMax: 40
+              suggestedMax: 35
             },
             yStrain: {
               type: 'linear',
               position: 'right',
+              afterFit: (axis) => { axis.width = 44; },
               grid: { drawOnChartArea: false },
-              ticks: { color: '#fbbf24', font: { size: 9, family: 'monospace' } },
+              border: { display: false },
+              ticks: { color: '#C8A165', font: { size: 12, family: "'Inter', sans-serif" } },
               suggestedMin: 90,
               suggestedMax: 145
             }
@@ -807,29 +871,64 @@
       });
     }
 
-    // Append to Event Log
-    function addEventLog(timeSec, tag, message, level = 'info') {
-      const logContainer = document.getElementById('event-log-container');
-      const timeStr = `T+${String(timeSec).padStart(3, '0')}s`;
-      let colorClass = 'text-slate-400';
-      if (level === 'warn') colorClass = 'text-amber-400';
-      if (level === 'crit') colorClass = 'text-rose-400 font-bold';
-      if (level === 'iso') colorClass = 'text-indigo-300 font-bold';
-      if (level === 'success') colorClass = 'text-emerald-400';
+    // Event Log Filter State: showAllEvents (false = state changes only, skips consecutive normal)
+    let showAllEvents = false;
 
-      const entry = document.createElement('div');
-      entry.className = `${colorClass} leading-tight`;
-      entry.innerHTML = `<span class="text-slate-600">[${timeStr}]</span> <span class="uppercase">[${tag}]</span> ${message}`;
-      logContainer.appendChild(entry);
-      logContainer.scrollTop = logContainer.scrollHeight;
+    // Append entry to Event Log Table (Plain table, no pills, colored text with dot, minimum 12px font)
+    function addEventLog(timeSec, eventText, zone, statusType) {
+      const logContainer = document.getElementById('event-log-container');
+      const timeStr = `T+${String(timeSec).padStart(2, '0')}s`;
+
+      let dotColor = 'bg-gray-400';
+      let textColor = 'text-gray-600';
+      let statusLabel = 'Normal';
+
+      if (statusType === 'warn') {
+        dotColor = 'bg-amber-500';
+        textColor = 'text-amber-700 font-medium';
+        statusLabel = 'Warning';
+      } else if (statusType === 'crit') {
+        dotColor = 'bg-red-600';
+        textColor = 'text-red-700 font-semibold';
+        statusLabel = 'Critical';
+      } else if (statusType === 'iso') {
+        dotColor = 'bg-slate-600';
+        textColor = 'text-slate-800 font-semibold';
+        statusLabel = 'Isolated';
+      }
+
+      const tr = document.createElement('tr');
+      tr.className = `border-b border-gray-100 hover:bg-gray-50/70 even:bg-[#F9FAFB] transition-colors`;
+      tr.innerHTML = `
+        <td class="py-2.5 px-3 font-tabular text-[12px] text-gray-500 whitespace-nowrap">${timeStr}</td>
+        <td class="py-2.5 px-3 text-[13px] text-gray-800 font-medium">${eventText}</td>
+        <td class="py-2.5 px-3 text-[13px] text-gray-600">${zone}</td>
+        <td class="py-2.5 px-3 text-[12px]">
+          <span class="inline-flex items-center gap-1.5 ${textColor}">
+            <span class="w-1.5 h-1.5 rounded-full ${dotColor}"></span>
+            ${statusLabel}
+          </span>
+        </td>
+      `;
+      logContainer.appendChild(tr);
+
+      // Auto scroll container
+      const tableWrapper = logContainer.parentElement ? logContainer.parentElement.parentElement : null;
+      if (tableWrapper) {
+        tableWrapper.scrollTop = tableWrapper.scrollHeight;
+      }
     }
 
-    // Reset Event Log to current index
+    // Reset and rebuild Event Log based on current timeline index and showAllEvents filter
     function rebuildEventLogs(targetIndex) {
       const logContainer = document.getElementById('event-log-container');
       logContainer.innerHTML = '';
-      addEventLog(0, 'INIT', 'H2-Shield™ safety supervisor online. Polling 13-channel bus.', 'info');
-      addEventLog(0, 'NORMAL', 'Baseline normal. Solenoid valves open, structural integrity nominal.', 'success');
+
+      // Baseline events at T=0
+      addEventLog(0, 'Supervisory telemetry active; vessel pressurized', 'All', 'normal');
+      addEventLog(0, 'XV-201 fast-acting solenoid verified open', 'Outlet', 'normal');
+
+      let lastZoneCStatus = 'Normal';
 
       for (let i = 1; i <= targetIndex; i++) {
         const row = telemetryData[i];
@@ -838,22 +937,29 @@
         // Status change
         if (row.System_Status !== prev.System_Status) {
           if (row.System_Status === 'Warning') {
-            addEventLog(row.Time_sec, 'WARNING', `Acoustic anomaly in Zone C (${row.Acoustic_C_dB} dB). Elevated structural activity.`, 'warn');
+            addEventLog(row.Time_sec, `Acoustic emission elevated (${row.Acoustic_C_dB.toFixed(1)} dB)`, 'Zone C', 'warn');
+            lastZoneCStatus = 'Warning';
           } else if (row.System_Status === 'Critical') {
-            addEventLog(row.Time_sec, 'CRITICAL', `Multi-sensor correlation breach! Leak: ${row.Leak_ppm} ppm, Strain: ${row.Strain_ue} µε.`, 'crit');
+            addEventLog(row.Time_sec, `Multi-sensor breach: leak ${row.Leak_ppm.toFixed(1)} ppm, strain ${row.Strain_ue.toFixed(1)} µε`, 'Zone C', 'crit');
+            lastZoneCStatus = 'Critical';
           } else if (row.System_Status === 'Isolated') {
-            addEventLog(row.Time_sec, 'ISOLATED', `Automatic solenoid isolation initiated. Valve closed at boundary.`, 'iso');
+            addEventLog(row.Time_sec, 'Automated safety interlock isolated containment line', 'Outlet', 'iso');
+            lastZoneCStatus = 'Isolated';
           } else if (row.System_Status === 'Normal') {
-            addEventLog(row.Time_sec, 'NORMAL', `System metrics reverted to nominal thresholds.`, 'success');
+            // When in default mode (showAllEvents == false), skip a "Normal" row that directly follows a "Warning" row at the same zone
+            if (showAllEvents || lastZoneCStatus !== 'Warning') {
+              addEventLog(row.Time_sec, 'Vessel parameters returned to nominal thresholds', 'All', 'normal');
+            }
+            lastZoneCStatus = 'Normal';
           }
         }
 
         // Valve change
         if (row.Valve_Status !== prev.Valve_Status) {
           if (row.Valve_Status === 'Closed') {
-            addEventLog(row.Time_sec, 'VALVE TRIP', 'Solenoid SV-101 CLOSED. Emergency Isolation Verified.', 'crit');
+            addEventLog(row.Time_sec, 'XV-201 valve closed / isolation verified', 'Outlet', 'crit');
           } else {
-            addEventLog(row.Time_sec, 'VALVE RESET', 'Solenoid SV-101 commanded OPEN.', 'info');
+            addEventLog(row.Time_sec, 'XV-201 valve open', 'Outlet', 'normal');
           }
         }
       }
@@ -872,258 +978,230 @@
       // 1. Clock & Scrubber
       document.getElementById('sim-clock').textContent = `T+${String(t).padStart(2, '0')}s`;
       document.getElementById('scrubber-slider').value = t;
+      document.getElementById('time-readout').textContent = `${t} s / 180 s`;
 
-      // 2. System Status Badge
+      // 2. Top Header System Status Badge (Plain, quiet at rest)
       const sysBadge = document.getElementById('sys-status-badge');
+      const sysDot = document.getElementById('sys-status-dot');
       const sysText = document.getElementById('sys-status-text');
-      sysBadge.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border transition-all duration-300 ";
 
       if (row.System_Status === 'Normal') {
-        sysBadge.className += "bg-emerald-950/70 border-emerald-500/50 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.3)]";
+        sysBadge.className = "px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 border bg-emerald-50 border-emerald-200 text-emerald-800";
+        sysDot.className = "w-1.5 h-1.5 rounded-full bg-emerald-600";
         sysText.textContent = "NORMAL";
       } else if (row.System_Status === 'Warning') {
-        sysBadge.className += "bg-amber-950/70 border-amber-500/60 text-amber-400 shadow-[0_0_14px_rgba(245,158,11,0.3)]";
+        sysBadge.className = "px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 border bg-amber-50 border-amber-300 text-amber-900";
+        sysDot.className = "w-1.5 h-1.5 rounded-full bg-amber-600";
         sysText.textContent = "WARNING";
       } else if (row.System_Status === 'Critical') {
-        sysBadge.className += "bg-rose-950/80 border-rose-500 text-rose-300 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.5)]";
+        sysBadge.className = "px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 border bg-red-50 border-red-300 text-red-900";
+        sysDot.className = "w-1.5 h-1.5 rounded-full bg-red-600";
         sysText.textContent = "CRITICAL";
       } else if (row.System_Status === 'Isolated') {
-        sysBadge.className += "bg-indigo-950/70 border-indigo-500/60 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.3)]";
+        sysBadge.className = "px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 border bg-slate-100 border-slate-300 text-slate-800";
+        sysDot.className = "w-1.5 h-1.5 rounded-full bg-slate-600";
         sysText.textContent = "ISOLATED";
       }
 
-      // 3. Valve Status Badge & Graphics
-      const valveBadge = document.getElementById('valve-status-badge');
-      const valveText = document.getElementById('valve-status-text');
-      const valveTag = document.getElementById('valve-state-tag');
-      const valveSubtext = document.getElementById('valve-subtext');
-      const valveIndLight = document.getElementById('valve-indicator-light');
-      const valveGateL = document.getElementById('valve-gate-left');
-      const valveGateR = document.getElementById('valve-gate-right');
-
-      if (row.Valve_Status === 'Open') {
-        valveBadge.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border bg-emerald-950/60 border-emerald-500/50 text-emerald-400";
-        valveText.textContent = "VALVE OPEN";
-        document.getElementById('valve-badge-icon').setAttribute('data-lucide', 'unlock');
-
-        valveTag.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-700";
-        valveTag.textContent = "SOLENOID ENERGIZED (OPEN)";
-
-        valveSubtext.textContent = "SV-101 OPEN";
-        valveSubtext.setAttribute('fill', '#94a3b8');
-        valveIndLight.setAttribute('fill', '#10b981');
-        valveGateL.setAttribute('transform', 'translate(-4, 0)');
-        valveGateR.setAttribute('transform', 'translate(4, 0)');
-        valveGateL.setAttribute('fill', '#38bdf8');
-        valveGateR.setAttribute('fill', '#38bdf8');
-      } else {
-        valveBadge.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 border bg-rose-950/80 border-rose-500/70 text-rose-300 shadow-[0_0_12px_rgba(239,68,68,0.4)]";
-        valveText.textContent = "VALVE CLOSED / ISOLATION VERIFIED";
-        document.getElementById('valve-badge-icon').setAttribute('data-lucide', 'lock');
-
-        valveTag.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-600 animate-pulse";
-        valveTag.textContent = "ISOLATION ACTIVE (CLOSED)";
-
-        valveSubtext.textContent = "SV-101 CLOSED";
-        valveSubtext.setAttribute('fill', '#f43f5e');
-        valveIndLight.setAttribute('fill', '#ef4444');
-        valveGateL.setAttribute('transform', 'translate(0, 0)');
-        valveGateR.setAttribute('transform', 'translate(0, 0)');
-        valveGateL.setAttribute('fill', '#ef4444');
-        valveGateR.setAttribute('fill', '#ef4444');
+      // Footer line valve text
+      const footerValve = document.getElementById('footer-valve-status');
+      if (footerValve) {
+        footerValve.textContent = `XV-201: ${row.Valve_Status === 'Open' ? 'Open' : 'Closed / Isolated'}`;
       }
 
-      // 4. Safety Sequence Protocol Banner
-      // Stages: Monitor (T>=0), Detect (T>=61), Verify (T>=90), Localize (T>=110), Isolate (T>=131), Confirm (T>=141)
-      const seqKeys = ['monitor', 'detect', 'verify', 'localize', 'isolate', 'confirm'];
+      // 3. Protocol Stepper (6 small numbered circles on a connecting line)
+      const seqSteps = ['monitor', 'detect', 'verify', 'localize', 'isolate', 'confirm'];
       const activeStage = t >= 141 ? 'confirm' :
                           t >= 131 ? 'isolate' :
                           t >= 110 ? 'localize' :
                           t >= 90 ? 'verify' :
                           t >= 61 ? 'detect' : 'monitor';
+      const actIdx = seqSteps.indexOf(activeStage);
 
-      seqKeys.forEach(k => {
-        const el = document.querySelector(`[data-seq="${k}"]`);
-        if (!el) return;
-        if (k === activeStage) {
-          el.className = "px-2.5 py-1 rounded border transition-all duration-300 bg-cyan-950/90 border-cyan-400 text-cyan-300 font-bold shadow-[0_0_12px_rgba(6,182,212,0.4)] ring-1 ring-cyan-400";
-        } else if (seqKeys.indexOf(k) < seqKeys.indexOf(activeStage)) {
-          el.className = "px-2.5 py-1 rounded border transition-all duration-300 bg-slate-900 border-slate-700 text-slate-300";
+      seqSteps.forEach((k, idx) => {
+        const circ = document.getElementById(`step-circ-${k}`);
+        const lbl = document.getElementById(`step-lbl-${k}`);
+        if (!circ || !lbl) return;
+
+        if (idx < actIdx) {
+          // Done = filled green circle with a check
+          circ.className = "w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-[#005C4B] text-white";
+          circ.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i>`;
+          lbl.className = "text-xs font-medium text-gray-900 mt-2 text-center";
+        } else if (idx === actIdx) {
+          // Active = amber ring with number (or green ring for step 1 at rest)
+          if (t >= 61) {
+            circ.className = "w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-white border-2 border-[#D97706] text-[#D97706]";
+            lbl.className = "text-xs font-semibold text-[#D97706] mt-2 text-center";
+          } else {
+            circ.className = "w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-[#005C4B] text-white";
+            lbl.className = "text-xs font-medium text-gray-900 mt-2 text-center";
+          }
+          circ.innerHTML = `${idx + 1}`;
         } else {
-          el.className = "px-2.5 py-1 rounded border transition-all duration-300 bg-slate-950 border-slate-800 text-slate-600";
+          // Upcoming = gray outline with number
+          circ.className = "w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors bg-white border border-gray-300 text-gray-500";
+          circ.innerHTML = `${idx + 1}`;
+          lbl.className = "text-xs font-medium text-gray-500 mt-2 text-center";
         }
       });
 
-      // 5. Physical Tank Schematic: Zone C Anomaly Logic
-      const zoneC = document.getElementById('zone-C');
-      const dotC = document.getElementById('sensor-c-dot');
-      const lblC = document.getElementById('lbl-zone-C');
-
-      // Reset Zone C animation classes
-      zoneC.classList.remove('zone-pulse-amber', 'zone-strobe-red');
-
-      if (t >= 141) {
-        // Isolated / Sealed boundary state
-        zoneC.setAttribute('fill', '#6366f1');
-        zoneC.setAttribute('fill-opacity', '0.35');
-        zoneC.setAttribute('stroke', '#818cf8');
-        dotC.setAttribute('fill', '#818cf8');
-        lblC.setAttribute('fill', '#c7d2fe');
-        lblC.textContent = 'ZONE C (SEALED)';
-      } else if (t >= 121) {
-        // Critical: Strobe Red
-        zoneC.classList.add('zone-strobe-red');
-        dotC.setAttribute('fill', '#ef4444');
-        lblC.setAttribute('fill', '#fca5a5');
-        lblC.textContent = 'ZONE C (RUPTURE)';
-      } else if (t >= 61) {
-        // Warning: Pulse Amber
-        zoneC.classList.add('zone-pulse-amber');
-        dotC.setAttribute('fill', '#f59e0b');
-        lblC.setAttribute('fill', '#fde68a');
-        lblC.textContent = 'ZONE C (ANOMALY)';
+      // 4. KPI Row (Tank pressure, Annular pressure, Leak rate, Strain)
+      // A value over limit turns amber, then red. Nothing else about card changes.
+      const elPress = document.getElementById('val-press');
+      elPress.textContent = row.Pressure_bar.toFixed(3);
+      if (row.Pressure_bar > 1.12 || row.Pressure_bar < 0.85) {
+        elPress.className = "text-[32px] font-semibold font-num text-[#B91C1C] leading-none";
+      } else if (row.Pressure_bar > 1.08) {
+        elPress.className = "text-[32px] font-semibold font-num text-[#D97706] leading-none";
       } else {
-        // Normal: Calm emerald
-        zoneC.setAttribute('fill', '#10b981');
-        zoneC.setAttribute('fill-opacity', '0.12');
-        zoneC.setAttribute('stroke', '#10b981');
-        dotC.setAttribute('fill', '#34d399');
-        lblC.setAttribute('fill', '#6ee7b7');
-        lblC.textContent = 'ZONE C';
+        elPress.className = "text-[32px] font-semibold font-num text-gray-900 leading-none";
       }
 
-      // Zone dB text readings on tank
+      const elAnnular = document.getElementById('val-annular');
+      elAnnular.textContent = row.Annular_Press_bar.toFixed(3);
+      if (row.Annular_Press_bar > 1.08) {
+        elAnnular.className = "text-[32px] font-semibold font-num text-[#B91C1C] leading-none";
+      } else if (row.Annular_Press_bar > 1.05) {
+        elAnnular.className = "text-[32px] font-semibold font-num text-[#D97706] leading-none";
+      } else {
+        elAnnular.className = "text-[32px] font-semibold font-num text-gray-900 leading-none";
+      }
+
+      const elLeak = document.getElementById('val-leak');
+      elLeak.textContent = row.Leak_ppm.toFixed(1);
+      if (row.Leak_ppm > 20) {
+        elLeak.className = "text-[32px] font-semibold font-num text-[#B91C1C] leading-none";
+      } else if (row.Leak_ppm > 0) {
+        elLeak.className = "text-[32px] font-semibold font-num text-[#D97706] leading-none";
+      } else {
+        elLeak.className = "text-[32px] font-semibold font-num text-gray-900 leading-none";
+      }
+
+      const elStrain = document.getElementById('val-strain');
+      elStrain.textContent = row.Strain_ue.toFixed(1);
+      if (row.Strain_ue > 130) {
+        elStrain.className = "text-[32px] font-semibold font-num text-[#B91C1C] leading-none";
+      } else if (row.Strain_ue > 115) {
+        elStrain.className = "text-[32px] font-semibold font-num text-[#D97706] leading-none";
+      } else {
+        elStrain.className = "text-[32px] font-semibold font-num text-gray-900 leading-none";
+      }
+
+      // 5. Redrawn SVG Schematic State & Zone Fills
+      // Zones A, B, D remain #F3F4F6
+      // Zone C: normal #F3F4F6, warning #FDE9C8 (amber), critical #FCA5A5 (red)
+      const fillC = document.getElementById('zone-fill-C');
+      const lblC = document.getElementById('lbl-zone-C');
+      const lineC = document.getElementById('line-zone-C');
+      const txtC = document.getElementById('txt-zone-C');
+
+      if (t >= 121) {
+        fillC.setAttribute('fill', '#FCA5A5'); // Flat Red
+        lblC.setAttribute('fill', '#991B1B');
+        if (lineC) lineC.setAttribute('stroke', '#B91C1C');
+        txtC.setAttribute('fill', '#B91C1C');
+      } else if (t >= 61) {
+        fillC.setAttribute('fill', '#FDE9C8'); // Flat Amber
+        lblC.setAttribute('fill', '#92400E');
+        if (lineC) lineC.setAttribute('stroke', '#D97706');
+        txtC.setAttribute('fill', '#D97706');
+      } else {
+        fillC.setAttribute('fill', '#F3F4F6');
+        lblC.setAttribute('fill', '#4B5563');
+        if (lineC) lineC.setAttribute('stroke', '#9CA3AF');
+        txtC.setAttribute('fill', '#1F2937');
+      }
+
+      // dB values under the vessel
       document.getElementById('txt-zone-A').textContent = `${row.Acoustic_A_dB.toFixed(1)} dB`;
       document.getElementById('txt-zone-B').textContent = `${row.Acoustic_B_dB.toFixed(1)} dB`;
       document.getElementById('txt-zone-C').textContent = `${row.Acoustic_C_dB.toFixed(1)} dB`;
       document.getElementById('txt-zone-D').textContent = `${row.Acoustic_D_dB.toFixed(1)} dB`;
 
-      // 6. Core Gauges Values & Progress Bars
-      document.getElementById('val-temp').textContent = row.Temperature_C.toFixed(2);
-      // Temp scale 20-35 C
-      const tempPct = Math.min(100, Math.max(0, ((row.Temperature_C - 20) / 15) * 100));
-      document.getElementById('bar-temp').style.width = `${tempPct}%`;
+      // Valve Graphic & Legend Status
+      const vGateL = document.getElementById('v-gate-left');
+      const vGateR = document.getElementById('v-gate-right');
+      const vActBox = document.getElementById('v-act-box');
+      const vLegendDot = document.getElementById('valve-legend-dot');
+      const vLegendStatus = document.getElementById('valve-legend-status');
+      const atLegendStatus = document.getElementById('at-legend-status');
+      const atLegendDot = document.getElementById('at-legend-dot');
 
-      document.getElementById('val-press').textContent = row.Pressure_bar.toFixed(3);
-      // Pressure scale 0.8 to 1.2
-      const pressPct = Math.min(100, Math.max(0, ((row.Pressure_bar - 0.8) / 0.4) * 100));
-      document.getElementById('bar-press').style.width = `${pressPct}%`;
-
-      document.getElementById('val-annular').textContent = row.Annular_Press_bar.toFixed(3);
-      const annPct = Math.min(100, Math.max(0, ((row.Annular_Press_bar - 0.95) / 0.2) * 100));
-      document.getElementById('bar-annular').style.width = `${annPct}%`;
-
-      document.getElementById('val-strain').textContent = row.Strain_ue.toFixed(1);
-      // Strain scale 90 to 150 ue
-      const strainPct = Math.min(100, Math.max(0, ((row.Strain_ue - 90) / 60) * 100));
-      document.getElementById('bar-strain').style.width = `${strainPct}%`;
-
-      document.getElementById('val-leak').textContent = row.Leak_ppm.toFixed(1);
-      // Leak scale 0 to 40 ppm
-      const leakPct = Math.min(100, Math.max(0, (row.Leak_ppm / 40) * 100));
-      document.getElementById('bar-leak').style.width = `${leakPct}%`;
-      const leakCard = document.getElementById('card-leak');
-      if (row.Leak_ppm > 20) {
-        leakCard.className = "bg-rose-950/40 border border-rose-500/70 rounded-xl p-3 flex flex-col justify-between transition-colors duration-300";
-      } else if (row.Leak_ppm > 0) {
-        leakCard.className = "bg-amber-950/40 border border-amber-500/70 rounded-xl p-3 flex flex-col justify-between transition-colors duration-300";
-      } else {
-        leakCard.className = "bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between transition-colors duration-300";
-      }
-
-      // 7. Acoustic Spectrum Mini-Bar Chart (Zones A-D)
-      const maxAcoustic = 20; // 0 to 20 dB
-      ['A', 'B', 'C', 'D'].forEach(zone => {
-        const val = row[`Acoustic_${zone}_dB`];
-        const bar = document.getElementById(`bar-ac-${zone}`);
-        const valEl = document.getElementById(`val-ac-${zone}`);
-        valEl.textContent = `${val.toFixed(1)} dB`;
-        const pct = Math.min(100, Math.max(5, (val / maxAcoustic) * 100));
-        bar.style.height = `${pct}%`;
-
-        if (val >= 12.0) {
-          bar.className = "w-full bg-rose-500 rounded transition-all duration-200 shadow-[0_0_10px_rgba(244,63,94,0.6)]";
-          valEl.className = "text-xs font-mono text-rose-400 font-bold";
-        } else if (val >= 8.0) {
-          bar.className = "w-full bg-amber-400 rounded transition-all duration-200 shadow-[0_0_8px_rgba(251,191,36,0.5)]";
-          valEl.className = "text-xs font-mono text-amber-400 font-bold";
-        } else {
-          bar.className = "w-full bg-emerald-500 rounded transition-all duration-200";
-          valEl.className = "text-xs font-mono text-emerald-400";
+      if (row.Valve_Status === 'Open') {
+        vGateL.setAttribute('transform', 'translate(-3, 0)');
+        vGateR.setAttribute('transform', 'translate(3, 0)');
+        vGateL.setAttribute('fill', '#E5E7EB');
+        vGateL.setAttribute('stroke', '#4B5563');
+        vGateR.setAttribute('fill', '#E5E7EB');
+        vGateR.setAttribute('stroke', '#4B5563');
+        if (vActBox) {
+          vActBox.setAttribute('fill', '#FFFFFF');
+          vActBox.setAttribute('stroke', '#6B7280');
         }
-      });
-
-      // 8. Decision Matrix Logic Gates
-      // Gate 1: Single Anomaly (Zone C Acoustic >= 8.0 dB) -> Trigger WARNING
-      const g1Active = row.Acoustic_C_dB >= 8.0 || ['Warning', 'Critical', 'Isolated'].includes(row.System_Status);
-      const gate1 = document.getElementById('gate-1');
-      const g1chk = document.getElementById('gate-1-chk');
-      const g1title = document.getElementById('gate-1-title');
-      if (g1Active) {
-        gate1.className = "p-2.5 rounded-lg border border-amber-500/50 bg-amber-950/30 flex items-start gap-2.5 transition-all";
-        g1chk.className = "text-amber-400 font-bold";
-        g1chk.textContent = "[✓]";
-        g1title.className = "text-amber-300";
+        vLegendDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-600";
+        vLegendStatus.className = "font-semibold text-emerald-800";
+        vLegendStatus.textContent = "Open";
       } else {
-        gate1.className = "p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all";
-        g1chk.className = "text-slate-600 font-bold";
-        g1chk.textContent = "[  ]";
-        g1title.className = "text-slate-400";
+        vGateL.setAttribute('transform', 'translate(0, 0)');
+        vGateR.setAttribute('transform', 'translate(0, 0)');
+        vGateL.setAttribute('fill', '#FCA5A5');
+        vGateL.setAttribute('stroke', '#B91C1C');
+        vGateR.setAttribute('fill', '#FCA5A5');
+        vGateR.setAttribute('stroke', '#B91C1C');
+        if (vActBox) {
+          vActBox.setAttribute('fill', '#FEE2E2');
+          vActBox.setAttribute('stroke', '#B91C1C');
+        }
+        vLegendDot.className = "w-2.5 h-2.5 rounded-full bg-red-600";
+        vLegendStatus.className = "font-semibold text-red-800";
+        vLegendStatus.textContent = "Closed / Isolated";
       }
 
-      // Gate 2: Multi-Sensor Correlation (Acoustic + Leak + Strain) -> Trigger CRITICAL
-      const g2Active = (row.Leak_ppm > 10 && row.Strain_ue > 120) || ['Critical', 'Isolated'].includes(row.System_Status);
-      const gate2 = document.getElementById('gate-2');
-      const g2chk = document.getElementById('gate-2-chk');
-      const g2title = document.getElementById('gate-2-title');
-      if (g2Active) {
-        gate2.className = "p-2.5 rounded-lg border border-rose-500/50 bg-rose-950/40 flex items-start gap-2.5 transition-all";
-        g2chk.className = "text-rose-400 font-bold";
-        g2chk.textContent = "[✓]";
-        g2title.className = "text-rose-300";
+      atLegendStatus.textContent = `${row.Leak_ppm.toFixed(1)} ppm`;
+      if (row.Leak_ppm > 20) {
+        atLegendDot.className = "w-2.5 h-2.5 rounded-full bg-red-600";
+      } else if (row.Leak_ppm > 0) {
+        atLegendDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
       } else {
-        gate2.className = "p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all";
-        g2chk.className = "text-slate-600 font-bold";
-        g2chk.textContent = "[  ]";
-        g2title.className = "text-slate-400";
+        atLegendDot.className = "w-2.5 h-2.5 rounded-full bg-gray-400";
       }
 
-      // Gate 3: Automatic Solenoid Trip -> Trigger ISOLATED
-      const g3Active = row.Valve_Status === 'Closed' || row.System_Status === 'Isolated';
-      const gate3 = document.getElementById('gate-3');
-      const g3chk = document.getElementById('gate-3-chk');
-      const g3title = document.getElementById('gate-3-title');
-      if (g3Active) {
-        gate3.className = "p-2.5 rounded-lg border border-indigo-500/50 bg-indigo-950/40 flex items-start gap-2.5 transition-all";
-        g3chk.className = "text-indigo-400 font-bold";
-        g3chk.textContent = "[✓]";
-        g3title.className = "text-indigo-300";
+      // Plain English Dynamic Caption under the drawing
+      const captionEl = document.getElementById('schematic-caption');
+      if (t >= 141) {
+        captionEl.textContent = `Fast-acting solenoid valve XV-201 closed. Zone C boundary isolated; venting prevented.`;
+      } else if (t >= 121) {
+        captionEl.textContent = `Zone C acoustic emission reached ${row.Acoustic_C_dB.toFixed(1)} dB with localized leak (${row.Leak_ppm.toFixed(1)} ppm) and elevated hoop strain (${row.Strain_ue.toFixed(1)} µε). Initiating automatic isolation.`;
+      } else if (t >= 61) {
+        captionEl.textContent = `Zone C acoustic emission is ${row.Acoustic_C_dB.toFixed(1)} dB, above the 8.0 dB limit. Locating source.`;
       } else {
-        gate3.className = "p-2.5 rounded-lg border border-slate-800 bg-slate-950/60 flex items-start gap-2.5 transition-all";
-        g3chk.className = "text-slate-600 font-bold";
-        g3chk.textContent = "[  ]";
-        g3title.className = "text-slate-400";
+        captionEl.textContent = `All four vessel zones operating normally within nominal acoustic and pressure thresholds.`;
       }
 
-      // 9. Update Strip Charts
+      // 6. Update Historical Strip Charts with Moving Average for Display
       if (chartPressure && chartLeakStrain) {
         const sliceData = telemetryData.slice(0, currentIndex + 1);
         const labels = sliceData.map(d => `T+${d.Time_sec}`);
 
-        // Pressure Chart
+        // Pressure Chart (5-point moving average smoothed for display)
+        const rawPress = sliceData.map(d => d.Pressure_bar);
+        const rawAnn = sliceData.map(d => d.Annular_Press_bar);
         chartPressure.data.labels = labels;
-        chartPressure.data.datasets[0].data = sliceData.map(d => d.Pressure_bar);
-        chartPressure.data.datasets[1].data = sliceData.map(d => d.Annular_Press_bar);
+        chartPressure.data.datasets[0].data = movingAverage5(rawPress);
+        chartPressure.data.datasets[1].data = movingAverage5(rawAnn);
         chartPressure.update('none');
 
-        // Leak & Strain Chart
+        // Leak & Strain Chart (3-point smoothed for display)
+        const rawLeak = sliceData.map(d => d.Leak_ppm);
+        const rawStrain = sliceData.map(d => d.Strain_ue);
         chartLeakStrain.data.labels = labels;
-        chartLeakStrain.data.datasets[0].data = sliceData.map(d => d.Leak_ppm);
-        chartLeakStrain.data.datasets[1].data = sliceData.map(d => d.Strain_ue);
+        chartLeakStrain.data.datasets[0].data = movingAverage3(rawLeak);
+        chartLeakStrain.data.datasets[1].data = movingAverage3(rawStrain);
         chartLeakStrain.update('none');
       }
 
-      // 10. Update lucide icons in dynamic components
+      // 7. Lucide Icons Update
       if (window.lucide) {
         window.lucide.createIcons();
       }
@@ -1141,15 +1219,20 @@
         // Check for live event log triggers
         if (curRow.System_Status !== prevStatus) {
           if (curRow.System_Status === 'Warning') {
-            addEventLog(curRow.Time_sec, 'WARNING', `Acoustic anomaly in Zone C (${curRow.Acoustic_C_dB} dB). Structural noise elevated.`, 'warn');
+            addEventLog(curRow.Time_sec, `Acoustic emission elevated (${curRow.Acoustic_C_dB.toFixed(1)} dB)`, 'Zone C', 'warn');
           } else if (curRow.System_Status === 'Critical') {
-            addEventLog(curRow.Time_sec, 'CRITICAL', `Correlation threshold breached! H2 Leak: ${curRow.Leak_ppm} ppm, Strain: ${curRow.Strain_ue} µε.`, 'crit');
+            addEventLog(curRow.Time_sec, `Multi-sensor breach: leak ${curRow.Leak_ppm.toFixed(1)} ppm, strain ${curRow.Strain_ue.toFixed(1)} µε`, 'Zone C', 'crit');
           } else if (curRow.System_Status === 'Isolated') {
-            addEventLog(curRow.Time_sec, 'ISOLATED', `Automatic solenoid isolation initiated. Line sealed.`, 'iso');
+            addEventLog(curRow.Time_sec, 'Automated safety interlock isolated containment line', 'Outlet', 'iso');
+          } else if (curRow.System_Status === 'Normal') {
+            const prevRow = telemetryData[currentIndex - 1];
+            if (showAllEvents || !prevRow || prevRow.System_Status !== 'Warning') {
+              addEventLog(curRow.Time_sec, 'Vessel parameters returned to nominal thresholds', 'All', 'normal');
+            }
           }
         }
         if (curRow.Valve_Status !== prevValve && curRow.Valve_Status === 'Closed') {
-          addEventLog(curRow.Time_sec, 'VALVE TRIP', 'Solenoid SV-101 CLOSED. Emergency Isolation Verified.', 'crit');
+          addEventLog(curRow.Time_sec, 'XV-201 valve closed / isolation verified', 'Outlet', 'crit');
         }
       } else {
         pausePlayback();
@@ -1159,7 +1242,7 @@
     function startPlayback() {
       if (isPlaying) return;
       isPlaying = true;
-      document.getElementById('play-pause-label').textContent = 'PAUSE';
+      document.getElementById('play-pause-label').textContent = 'HALT';
       document.getElementById('play-pause-icon').setAttribute('data-lucide', 'pause');
       if (window.lucide) window.lucide.createIcons();
 
@@ -1190,9 +1273,9 @@
       playbackSpeed = speed;
       document.querySelectorAll('.speed-btn').forEach(btn => {
         if (parseInt(btn.getAttribute('data-speed'), 10) === speed) {
-          btn.className = "speed-btn px-2.5 py-1 text-xs font-bold rounded bg-cyan-600 text-white";
+          btn.className = "speed-btn px-2.5 py-1 text-xs font-bold font-tabular rounded-md bg-white text-[#005C4B] border border-gray-200";
         } else {
-          btn.className = "speed-btn px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white";
+          btn.className = "speed-btn px-2.5 py-1 text-xs font-medium font-tabular rounded-md text-gray-600 hover:text-gray-900 border border-transparent";
         }
       });
       if (isPlaying) {
@@ -1230,6 +1313,16 @@
           setSpeed(spd);
         });
       });
+
+      // Toggle event log filter: State changes only vs Show all events
+      const toggleBtn = document.getElementById('btn-toggle-events');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          showAllEvents = !showAllEvents;
+          toggleBtn.textContent = showAllEvents ? 'Show state changes only' : 'Show all events';
+          rebuildEventLogs(currentIndex);
+        });
+      }
 
       if (window.lucide) {
         window.lucide.createIcons();
